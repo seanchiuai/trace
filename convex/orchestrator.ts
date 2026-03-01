@@ -25,6 +25,7 @@ function buildSystemPrompt(maigretAvailable: boolean, extremeMode: boolean = fal
     `${n++}. browser_action(instruction) — Control a web browser. Give clear instructions like "Go to imginn.com/username and report what you see." IMPORTANT: For Instagram profiles, ALWAYS use imginn.com (e.g. imginn.com/username) instead of instagram.com — it shows public profiles without login walls. Returns screenshots and page text. Use for interactive pages that require scrolling or JS rendering. EXPENSIVE — prefer web_search for simple lookups.`,
     `${n++}. web_search(query, count?) — Fast web search. Returns titles, URLs, and snippets. Use this FIRST for simple lookups like "John Smith LinkedIn", "username site:twitter.com", company info, news articles, etc. Much faster and cheaper than browser_action.`,
     `${n++}. geospy_predict(imageUrl) — AI photo geolocation. Upload a photo URL and get predicted GPS coordinates, city, country, and an explanation of the visual clues used. Use on any image that might reveal a location (street views, landmarks, scenery).`,
+    `${n++}. geo_locate(imageUrl) — AI geolocation via Picarta: analyzes an image and predicts WHERE it was taken (city, state, country, GPS coordinates) based on visual clues. Returns coordinates, confidence score, EXIF metadata, and top-3 predictions. Use on any photo with visible backgrounds, landmarks, or architecture.`,
     `${n++}. reverse_image_search(imageUrl) — Reverse image search. Find where a photo appears online — social profiles, news articles, blogs. Returns visual matches, knowledge graph identity, and text in the image.`
   );
   if (extremeMode) {
@@ -34,7 +35,7 @@ function buildSystemPrompt(maigretAvailable: boolean, extremeMode: boolean = fal
     );
   }
   toolLines.push(
-    `${n++}. save_finding(source, category, platform, data, confidence) — Save a confirmed finding. Categories: "social", "connection", "location", "activity", "identity". FREE — does not count toward your step budget. Save findings liberally as you discover them.`,
+    `${n++}. save_finding(source, category, platform, data, confidence, imageUrl?, profileUrl?) — Save a confirmed finding. Categories: "social", "connection", "location", "activity", "identity". FREE — does not count toward your step budget. Save findings liberally as you discover them. IMPORTANT: When you find profile photos, post images, or any visual evidence, ALWAYS include the imageUrl. On imginn.com, image URLs look like "https://imginn.com/p/..." or CDN URLs from the page.`,
     `${n++}. done(report) — End the investigation and generate the final report.`
   );
 
@@ -55,6 +56,7 @@ function buildSystemPrompt(maigretAvailable: boolean, extremeMode: boolean = fal
     `  - Professional → prioritize LinkedIn, GitHub, company pages`,
     `  - Founder/entrepreneur → check Crunchbase, AngelList, press coverage`,
     `  - General → cast a wide net across major platforms`,
+    `- When you find photos with visible backgrounds (buildings, streets, landscapes), run geo_locate to predict GPS location`,
     `- Use web_search for simple lookups; reserve browser_action for pages that need interaction`,
     `- Save findings as you go (it's free — doesn't burn steps)`,
     `- You can call multiple tools at once — do so when actions are independent`,
@@ -134,6 +136,18 @@ const TOOL_DEFINITIONS = [
     },
   },
   {
+    name: "geo_locate",
+    description:
+      "AI geolocation via Picarta: analyzes an image and predicts WHERE it was taken based on visual clues. Returns city, country, GPS coordinates, confidence score, top-3 predictions, and EXIF metadata.",
+    input_schema: {
+      type: "object",
+      properties: {
+        imageUrl: { type: "string", description: "URL of the image to geo-locate" },
+      },
+      required: ["imageUrl"],
+    },
+  },
+  {
     name: "whitepages_lookup",
     description:
       "Deep person lookup — search by name, phone number, or both. Returns real addresses, age, phone numbers, and associated people. EXTREME MODE ONLY.",
@@ -191,6 +205,7 @@ const TOOL_DEFINITIONS = [
         category: { type: "string", enum: ["social", "connection", "location", "activity", "identity"] },
         platform: { type: "string", description: "Platform name" },
         profileUrl: { type: "string", description: "URL if applicable" },
+        imageUrl: { type: "string", description: "URL of a relevant image (profile photo, post image, etc.). Always include when available." },
         data: { type: "string", description: "Description of the finding" },
         confidence: { type: "number", description: "Confidence 0-100" },
       },
@@ -613,6 +628,32 @@ async function executeToolCall(
         return JSON.stringify(geoResult);
       }
 
+      case "geo_locate": {
+        await ctx.runMutation(api.investigations.addStep, {
+          investigationId,
+          stepNumber,
+          action: `Running Picarta AI geolocation on image`,
+          tool: "geo_locate",
+        });
+        const picartaResult = await ctx.runAction(internal.tools.picarta.localize, {
+          imageUrl: toolCall.args.imageUrl as string,
+        });
+        // Auto-save location finding if we got coordinates
+        if (picartaResult.latitude && picartaResult.longitude) {
+          const locationParts = [picartaResult.city, picartaResult.province, picartaResult.country].filter(Boolean);
+          const conf = picartaResult.confidence ? Math.round(picartaResult.confidence * 100) : 60;
+          await ctx.runMutation(api.investigations.addFinding, {
+            investigationId,
+            source: "picarta",
+            category: "location",
+            platform: "picarta",
+            data: `Photo geo-located to ${locationParts.join(", ")} (${picartaResult.latitude}, ${picartaResult.longitude}). Confidence: ${conf}%${picartaResult.exifCountry ? `. EXIF confirms: ${picartaResult.exifCountry}` : ""}`,
+            confidence: conf,
+          });
+        }
+        return JSON.stringify(picartaResult);
+      }
+
       case "whitepages_lookup": {
         await ctx.runMutation(api.investigations.addStep, {
           investigationId,
@@ -720,6 +761,7 @@ async function executeToolCall(
           category: string;
           platform?: string;
           profileUrl?: string;
+          imageUrl?: string;
           data: string;
           confidence: number;
         };
@@ -729,6 +771,7 @@ async function executeToolCall(
           category: findingArgs.category,
           platform: findingArgs.platform,
           profileUrl: findingArgs.profileUrl,
+          imageUrl: findingArgs.imageUrl,
           data: findingArgs.data,
           confidence: findingArgs.confidence,
         });
