@@ -3,6 +3,7 @@ import { action, internalAction } from "./_generated/server";
 import { internal, api } from "./_generated/api";
 import type { ActionCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
+import { TOOL_NAMES } from "./toolNames";
 
 const MAX_STEPS = 20;
 const MAX_CONSECUTIVE_SAVE_ONLY = 3;
@@ -19,37 +20,37 @@ function buildSystemPrompt(maigretAvailable: boolean, extremeMode: boolean = fal
   const toolLines: string[] = [];
   let n = 1;
   const isEnabled = (name: string) => !disabledTools.includes(name);
-  if (maigretAvailable && isEnabled("maigret_search")) {
+  if (maigretAvailable && isEnabled(TOOL_NAMES.MAIGRET_SEARCH)) {
     toolLines.push(
       `${n++}. maigret_search(username) - OSINT search across 3,000+ sites. AI extracts connected handles from bios/metadata and auto-searches those leads. Returns profiles, leads, connection graph. High-value first move when you have a username.`
     );
   }
-  if (isEnabled("browser_action")) {
+  if (isEnabled(TOOL_NAMES.BROWSER_ACTION)) {
     toolLines.push(
       `${n++}. browser_action(instruction) - Control a real browser. Returns page text. SLOW (~60-180s) and LIMITED to ${MAX_BROWSER_ACTIONS} uses per investigation. See BROWSER RULES and LOGIN WALL AVOIDANCE below.`
     );
   }
-  if (isEnabled("web_search")) {
+  if (isEnabled(TOOL_NAMES.WEB_SEARCH)) {
     toolLines.push(
       `${n++}. web_search(query, count?) - Fast web search (<1s). Returns titles, URLs, snippets. YOUR DEFAULT TOOL for lookups.`
     );
   }
-  if (isEnabled("geo_locate")) {
+  if (isEnabled(TOOL_NAMES.GEO_LOCATE)) {
     toolLines.push(
       `${n++}. geo_locate(imageUrl) - Picarta AI geolocation. Returns coordinates, confidence, EXIF, top-3 predictions.`
     );
   }
-  if (isEnabled("reverse_image_search")) {
+  if (isEnabled(TOOL_NAMES.REVERSE_IMAGE_SEARCH)) {
     toolLines.push(
       `${n++}. reverse_image_search(imageUrl) - Find where a photo appears online. Returns visual matches, knowledge graph, OCR text.`
     );
   }
-  if (extremeMode && isEnabled("whitepages_lookup")) {
+  if (extremeMode && isEnabled(TOOL_NAMES.WHITEPAGES_LOOKUP)) {
     toolLines.push(
       `${n++}. whitepages_lookup(name?, phone?, city?, stateCode?) - Deep person lookup. Returns addresses, age, phones, associates.`
     );
   }
-  if (extremeMode && isEnabled("darkweb_search")) {
+  if (extremeMode && isEnabled(TOOL_NAMES.DARKWEB_SEARCH)) {
     toolLines.push(
       `${n++}. darkweb_search(term, maxResults?) - Search leaked databases and paste sites for emails, usernames, phones.`
     );
@@ -95,12 +96,12 @@ Combine save_finding calls with your next research action in the same turn.
 Adapt to what you know. Each step is precious - make it count.
 
 **Phase 1 - Cast the Net (Steps 1-5):**
-${maigretAvailable && isEnabled("maigret_search") ? "- Username known -> start with maigret_search (wide OSINT net)" : ""}
+${maigretAvailable && isEnabled(TOOL_NAMES.MAIGRET_SEARCH) ? "- Username known -> start with maigret_search (wide OSINT net)" : ""}
 - Name only -> parallel web_search: "Name LinkedIn", "Name Twitter", "Name Instagram", "Name GitHub"
 - Common name -> add description details (city, job, age) to searches; use ask_user if results are ambiguous
 - Photo available -> parallel: geo_locate + reverse_image_search
 - Links provided -> web_search each link for context
-${extremeMode && isEnabled("darkweb_search") ? "- Email/username -> darkweb_search for breach records" : ""}
+${extremeMode && isEnabled(TOOL_NAMES.DARKWEB_SEARCH) ? "- Email/username -> darkweb_search for breach records" : ""}
 
 **Phase 2 - Follow Leads (Steps 6-14):**
 - Cross-reference findings: verify identities across platforms
@@ -537,10 +538,10 @@ export const step = internalAction({
 
     const tools = TOOL_DEFINITIONS.filter((t) => {
       if (disabledTools.includes(t.name)) return false;
-      if (t.name === "maigret_search" && !maigretAvailable) return false;
-      if (t.name === "whitepages_lookup" && !extremeMode) return false;
-      if (t.name === "darkweb_search" && !extremeMode) return false;
-      if (t.name === "browser_action" && browserActionsUsed >= MAX_BROWSER_ACTIONS) return false;
+      if (t.name === TOOL_NAMES.MAIGRET_SEARCH && !maigretAvailable) return false;
+      if (t.name === TOOL_NAMES.WHITEPAGES_LOOKUP && !extremeMode) return false;
+      if (t.name === TOOL_NAMES.DARKWEB_SEARCH && !extremeMode) return false;
+      if (t.name === TOOL_NAMES.BROWSER_ACTION && browserActionsUsed >= MAX_BROWSER_ACTIONS) return false;
       return true;
     });
 

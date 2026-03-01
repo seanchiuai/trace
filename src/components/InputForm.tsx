@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
+import { STANDARD_TOOL_DEFS, EXTREME_TOOL_DEFS } from "../../convex/toolNames";
 
 interface InputFormProps {
   onSubmit: (data: {
@@ -15,18 +16,8 @@ interface InputFormProps {
   loading: boolean;
 }
 
-const STANDARD_TOOLS = [
-  { name: "web_search", label: "Brave Search" },
-  { name: "browser_action", label: "Browser Use" },
-  { name: "maigret_search", label: "Maigret OSINT" },
-  { name: "geo_locate", label: "Photo Geolocation" },
-  { name: "reverse_image_search", label: "Reverse Image Search" },
-] as const;
-
-const EXTREME_TOOLS = [
-  { name: "whitepages_lookup", label: "WhitePages Lookup" },
-  { name: "darkweb_search", label: "Dark Web Search" },
-] as const;
+const STANDARD_TOOLS = STANDARD_TOOL_DEFS;
+const EXTREME_TOOLS = EXTREME_TOOL_DEFS;
 
 function FormField({
   label,
