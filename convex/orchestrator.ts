@@ -6,6 +6,15 @@ import type { ActionCtx } from "./_generated/server";
 const MAX_STEPS = 20;
 const MAX_CONSECUTIVE_SAVE_ONLY = 3;
 
+// Issue 7: History compression — sliding window + Sonnet summarization
+const COMPRESSION_TOKEN_THRESHOLD = 20_000; // ~70K chars → trigger compression
+const KEEP_RECENT_EXCHANGES = 3; // Keep last 3 exchanges verbatim
+
+/** Rough token estimate: ~3.5 chars per token for mixed English/JSON */
+function estimateTokens(text: string): number {
+  return Math.ceil(text.length / 3.5);
+}
+
 // Issue 3: Adaptive system prompt — no fixed strategy, considers target type & available info
 const SYSTEM_PROMPT = `You are an expert missing persons investigator. You think methodically, follow leads, and build a comprehensive picture of a person's digital footprint.
 
@@ -382,10 +391,22 @@ export const step = internalAction({
       { role: "user", content: toolResultBlocks },
     ];
 
+    // Issue 7: Compress history if it exceeds token threshold before scheduling
+    const { history: finalHistory, compressionTokens } =
+      await compressHistory(updatedHistory, stepNumber);
+
+    if (compressionTokens) {
+      await ctx.runMutation(api.investigations.updateTokenUsage, {
+        id: args.investigationId,
+        inputTokens: compressionTokens.input,
+        outputTokens: compressionTokens.output,
+      });
+    }
+
     // Schedule the next step
     await ctx.scheduler.runAfter(0, internal.orchestrator.step, {
       investigationId: args.investigationId,
-      conversationHistory: JSON.stringify(updatedHistory),
+      conversationHistory: JSON.stringify(finalHistory),
       consecutiveSaveOnlySteps: consecutiveSaveOnly,
     });
   },
@@ -603,34 +624,204 @@ async function executeToolCall(
   }
 }
 
+// Issue 7: Compress conversation history when it exceeds token threshold
+interface CompressionResult {
+  history: Array<Record<string, unknown>>;
+  compressionTokens?: { input: number; output: number };
+}
+
+async function compressHistory(
+  conversationHistory: Array<Record<string, unknown>>,
+  stepNumber: number
+): Promise<CompressionResult> {
+  const serialized = JSON.stringify(conversationHistory);
+  const estimatedTokens = estimateTokens(serialized);
+
+  // If already compressed, raise threshold to avoid thrashing
+  const alreadyCompressed =
+    typeof conversationHistory[0]?.content === "string" &&
+    (conversationHistory[0].content as string).includes(
+      "[INVESTIGATION PROGRESS"
+    );
+  const effectiveThreshold = alreadyCompressed
+    ? COMPRESSION_TOKEN_THRESHOLD * 1.3
+    : COMPRESSION_TOKEN_THRESHOLD;
+
+  // Only compress if over threshold
+  if (estimatedTokens <= effectiveThreshold || conversationHistory.length < 6) {
+    return { history: conversationHistory };
+  }
+
+  // Each exchange = 2 messages (assistant + user/tool_result), starting at index 1
+  // Keep last KEEP_RECENT_EXCHANGES exchanges = last 2*K messages
+  const keepCount = KEEP_RECENT_EXCHANGES * 2;
+  let cutoffIndex = Math.max(1, conversationHistory.length - keepCount);
+  // Ensure cutoff falls on an exchange boundary (odd index = assistant start)
+  if (cutoffIndex % 2 === 0) cutoffIndex--;
+  if (cutoffIndex <= 1) return { history: conversationHistory };
+
+  const originalMessage = conversationHistory[0];
+  const messagesToSummarize = conversationHistory.slice(1, cutoffIndex);
+  const recentMessages = conversationHistory.slice(cutoffIndex);
+
+  // Build text representation of messages to summarize
+  const summaryInput = messagesToSummarize
+    .map((msg) => {
+      const role = msg.role as string;
+      if (role === "assistant") {
+        const content = msg.content as Array<{
+          type: string;
+          text?: string;
+          name?: string;
+          input?: unknown;
+        }>;
+        const text = content?.find((b) => b.type === "text")?.text || "";
+        const toolUses = content?.filter((b) => b.type === "tool_use") || [];
+        const toolSummary = toolUses
+          .map(
+            (t) =>
+              `${t.name}(${JSON.stringify(t.input).slice(0, 200)})`
+          )
+          .join(", ");
+        return `[Assistant] ${text.slice(0, 500)}${toolSummary ? `\nTools called: ${toolSummary}` : ""}`;
+      } else if (role === "user") {
+        const content = msg.content;
+        if (Array.isArray(content)) {
+          const results = (
+            content as Array<{ type: string; content?: string }>
+          )
+            .filter((b) => b.type === "tool_result")
+            .map((b) => (b.content || "").slice(0, 1000))
+            .join("\n");
+          return `[Tool results] ${results}`;
+        }
+        return `[User] ${String(content).slice(0, 500)}`;
+      }
+      return "";
+    })
+    .filter(Boolean)
+    .join("\n\n");
+
+  try {
+    const apiKey = process.env.ANTHROPIC_API_KEY;
+    if (!apiKey) return { history: conversationHistory };
+
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 1024,
+        messages: [
+          {
+            role: "user",
+            content: `You are summarizing the progress of an OSINT investigation. The investigator needs this summary to continue making good decisions.
+
+Summarize the following investigation steps concisely. Include:
+1. **Tools used & results**: What was searched and key data points found
+2. **Confirmed findings**: Social profiles, identities, connections discovered
+3. **Leads identified**: Usernames, platforms, connections worth exploring
+4. **What's been explored**: So the investigator doesn't repeat work
+5. **Dead ends**: Anything tried that yielded nothing
+
+Be concise but preserve all actionable intelligence. No raw tool output — only meaningful findings and conclusions.
+
+Steps to summarize:
+${summaryInput}`,
+          },
+        ],
+      }),
+    });
+
+    if (!response.ok) {
+      console.warn(
+        "History compression API call failed, using uncompressed history"
+      );
+      return { history: conversationHistory };
+    }
+
+    const data = await response.json();
+    const summary =
+      data.content?.find((b: { type: string }) => b.type === "text")?.text ||
+      "";
+
+    if (!summary) {
+      console.warn(
+        "History compression returned empty summary, using uncompressed history"
+      );
+      return { history: conversationHistory };
+    }
+
+    // Merge original brief + summary into one user message.
+    // recentMessages[0] is always an assistant message, so alternation is valid:
+    // user (merged) → assistant → user → assistant → ...
+    const compressedHistory: Array<Record<string, unknown>> = [
+      {
+        role: "user",
+        content: `${originalMessage.content as string}\n\n---\n\n[INVESTIGATION PROGRESS — Steps 1-${Math.floor(cutoffIndex / 2)} compressed]\n\n${summary}\n\n[End of progress summary. Recent steps follow.]`,
+      },
+      ...recentMessages,
+    ];
+
+    const compressedSize = estimateTokens(JSON.stringify(compressedHistory));
+    console.log(
+      `History compressed: ${estimatedTokens} tokens -> ${compressedSize} tokens (${messagesToSummarize.length} messages summarized, ${recentMessages.length} kept)`
+    );
+
+    return {
+      history: compressedHistory,
+      compressionTokens: data.usage
+        ? {
+            input: data.usage.input_tokens ?? 0,
+            output: data.usage.output_tokens ?? 0,
+          }
+        : undefined,
+    };
+  } catch (error) {
+    console.warn("History compression failed, using uncompressed:", error);
+    return { history: conversationHistory };
+  }
+}
+
 async function generateReport(
   ctx: Pick<ActionCtx, "runQuery" | "runMutation" | "runAction">,
   investigationId: string,
-  conversationHistory: string
+  _conversationHistory: string
 ) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new Error("ANTHROPIC_API_KEY not set");
+
+  // Issue 7: Reconstruct context from DB instead of passing full conversation history.
+  // This bounds report input to ~15K tokens regardless of step count.
+  const investigation = await ctx.runQuery(api.investigations.get, {
+    id: investigationId as any,
+  });
 
   const findings = await ctx.runQuery(api.investigations.getFindings, {
     investigationId: investigationId as any,
   });
 
-  const history = JSON.parse(conversationHistory);
-  history.push({
-    role: "user",
-    content: `Generate a comprehensive detective report based on all findings so far. Include:
-1. Subject Profile (name, known info, confirmed identities)
-2. Digital Footprint (all confirmed social profiles)
-3. Connections (people identified through photos, tags, interactions)
-4. Recent Activity (last known online activity, locations mentioned)
-5. Key Evidence (most important findings with confidence scores)
-6. Recommendations (suggested next steps for further investigation)
-
-Findings so far:
-${findings.map((f: { category: string; data: string; confidence: number; source: string }) => `- [${f.category}] ${f.data} (confidence: ${f.confidence}%, source: ${f.source})`).join("\n")}
-
-Format as markdown. Be thorough and professional.`,
+  const steps = await ctx.runQuery(api.investigations.getSteps, {
+    investigationId: investigationId as any,
   });
+
+  const stepsContext = steps
+    .map(
+      (s: { stepNumber: number; tool: string; action: string; result?: string }) =>
+        `Step ${s.stepNumber} [${s.tool}]: ${s.action}${s.result ? `\nResult: ${s.result}` : ""}`
+    )
+    .join("\n\n");
+
+  const findingsContext = findings
+    .map(
+      (f: { category: string; data: string; confidence: number; source: string; platform?: string }) =>
+        `- [${f.category}] ${f.data} (confidence: ${f.confidence}%, source: ${f.source}${f.platform ? `, platform: ${f.platform}` : ""})`
+    )
+    .join("\n");
 
   const response = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
@@ -642,7 +833,32 @@ Format as markdown. Be thorough and professional.`,
     body: JSON.stringify({
       model: "claude-opus-4-20250514",
       max_tokens: 4096,
-      messages: history,
+      system: SYSTEM_PROMPT,
+      messages: [
+        {
+          role: "user",
+          content: `You are writing the final report for an investigation.
+
+Target: ${investigation?.targetName || "Unknown"}
+${investigation?.targetDescription ? `Description: ${investigation.targetDescription}` : ""}
+
+## Investigation Steps Taken
+${stepsContext}
+
+## Confirmed Findings
+${findingsContext}
+
+Generate a comprehensive detective report. Include:
+1. Subject Profile (name, known info, confirmed identities)
+2. Digital Footprint (all confirmed social profiles)
+3. Connections (people identified through photos, tags, interactions)
+4. Recent Activity (last known online activity, locations mentioned)
+5. Key Evidence (most important findings with confidence scores)
+6. Recommendations (suggested next steps for further investigation)
+
+Format as markdown. Be thorough and professional.`,
+        },
+      ],
     }),
   });
 
