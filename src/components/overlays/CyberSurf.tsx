@@ -68,10 +68,10 @@ export default function CyberSurf() {
         const z = rawZ / (gridLines * gridSpacing); // 0..1 depth
         const screenY = horizon + z * z * (h - horizon);
         const spread = 1 + z * 3;
-        const alpha = (1 - z) * 0.12;
+        const alpha = (1 - z) * 0.28;
 
         ctx.strokeStyle = `rgba(${CYAN.join(",")}, ${alpha})`;
-        ctx.lineWidth = z < 0.3 ? 1 : 0.5;
+        ctx.lineWidth = z < 0.3 ? 1.5 : 0.8;
         ctx.beginPath();
         ctx.moveTo(vanishX - w * spread * 0.6, screenY);
         ctx.lineTo(vanishX + w * spread * 0.6, screenY);
@@ -80,9 +80,9 @@ export default function CyberSurf() {
 
       // Vertical lines converging to vanishing point
       for (let i = -8; i <= 8; i++) {
-        const alpha = Math.max(0.02, 0.08 - Math.abs(i) * 0.008);
+        const alpha = Math.max(0.05, 0.18 - Math.abs(i) * 0.015);
         ctx.strokeStyle = `rgba(${CYAN.join(",")}, ${alpha})`;
-        ctx.lineWidth = 0.5;
+        ctx.lineWidth = 0.8;
         ctx.beginPath();
         ctx.moveTo(vanishX + i * 80, h);
         ctx.lineTo(vanishX + i * 5, horizon);
@@ -90,14 +90,14 @@ export default function CyberSurf() {
       }
 
       // Vanishing point glow
-      const vg = ctx.createRadialGradient(vanishX, horizon, 0, vanishX, horizon, 120);
-      vg.addColorStop(0, `rgba(${ACCENT.join(",")}, 0.08)`);
+      const vg = ctx.createRadialGradient(vanishX, horizon, 0, vanishX, horizon, 160);
+      vg.addColorStop(0, `rgba(${ACCENT.join(",")}, 0.2)`);
       vg.addColorStop(1, "transparent");
       ctx.fillStyle = vg;
-      ctx.fillRect(vanishX - 120, horizon - 120, 240, 240);
+      ctx.fillRect(vanishX - 160, horizon - 160, 320, 320);
 
       // ── CRT scan lines ──
-      ctx.fillStyle = `rgba(${CYAN.join(",")}, 0.015)`;
+      ctx.fillStyle = `rgba(${CYAN.join(",")}, 0.025)`;
       for (let y = 0; y < h; y += 3) {
         ctx.fillRect(0, y, w, 1);
       }
@@ -106,13 +106,13 @@ export default function CyberSurf() {
       const scanY = (frame * 1.5) % h;
       const scanGrad = ctx.createLinearGradient(0, scanY - 15, 0, scanY + 15);
       scanGrad.addColorStop(0, "transparent");
-      scanGrad.addColorStop(0.5, `rgba(${CYAN.join(",")}, 0.06)`);
+      scanGrad.addColorStop(0.5, `rgba(${CYAN.join(",")}, 0.12)`);
       scanGrad.addColorStop(1, "transparent");
       ctx.fillStyle = scanGrad;
       ctx.fillRect(0, scanY - 15, w, 30);
 
       // ── Data packets traveling along grid ──
-      if (Math.random() > 0.93) {
+      if (Math.random() > 0.88) {
         const startSide = Math.random() > 0.5;
         packets.push({
           x: startSide ? Math.random() * w * 0.3 : w * 0.7 + Math.random() * w * 0.3,
@@ -133,16 +133,22 @@ export default function CyberSurf() {
         const py = p.y + (p.targetY - p.y) * t * t;
         const size = 3 * (1 - t) + 1;
 
-        // Packet trail
+        // Packet trail — bright core
         ctx.beginPath();
         ctx.arc(px, py, size, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(${ACCENT.join(",")}, ${(1 - t) * 0.7})`;
+        ctx.fillStyle = `rgba(${ACCENT.join(",")}, ${(1 - t) * 0.95})`;
         ctx.fill();
 
-        // Glow
+        // White-hot center
         ctx.beginPath();
-        ctx.arc(px, py, size * 3, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(${ACCENT.join(",")}, ${(1 - t) * 0.1})`;
+        ctx.arc(px, py, size * 0.5, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(255, 255, 255, ${(1 - t) * 0.6})`;
+        ctx.fill();
+
+        // Glow halo
+        ctx.beginPath();
+        ctx.arc(px, py, size * 5, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(${ACCENT.join(",")}, ${(1 - t) * 0.15})`;
         ctx.fill();
 
         if (t >= 1) packets.splice(i, 1);
@@ -166,7 +172,7 @@ export default function CyberSurf() {
         const t = texts[i];
         t.x += t.vx;
         t.life -= 1 / t.maxLife;
-        const alpha = Math.min(t.life, 0.3);
+        const alpha = Math.min(t.life, 0.5);
         ctx.fillStyle = `rgba(${CYAN.join(",")}, ${alpha})`;
         ctx.fillText(t.text, t.x, t.y);
         if (t.life <= 0) texts.splice(i, 1);
@@ -177,13 +183,20 @@ export default function CyberSurf() {
       const nodeY = h * 0.15 + Math.cos(frame * 0.015) * 10;
       ctx.beginPath();
       ctx.arc(nodeX, nodeY, 20, 0, Math.PI * 2);
-      ctx.strokeStyle = `rgba(${CYAN.join(",")}, 0.1)`;
-      ctx.lineWidth = 1;
+      ctx.strokeStyle = `rgba(${CYAN.join(",")}, 0.2)`;
+      ctx.lineWidth = 1.5;
       ctx.stroke();
       ctx.beginPath();
-      ctx.arc(nodeX, nodeY, 3, 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(${CYAN.join(",")}, 0.3)`;
+      ctx.arc(nodeX, nodeY, 4, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(${CYAN.join(",")}, 0.6)`;
       ctx.fill();
+
+      // Node glow
+      const ng = ctx.createRadialGradient(nodeX, nodeY, 0, nodeX, nodeY, 30);
+      ng.addColorStop(0, `rgba(${CYAN.join(",")}, 0.12)`);
+      ng.addColorStop(1, "transparent");
+      ctx.fillStyle = ng;
+      ctx.fillRect(nodeX - 30, nodeY - 30, 60, 60);
 
       animId = requestAnimationFrame(draw);
     };
@@ -198,7 +211,7 @@ export default function CyberSurf() {
   return (
     <canvas
       ref={canvasRef}
-      className="absolute inset-0 opacity-22 pointer-events-none"
+      className="absolute inset-0 opacity-35 pointer-events-none"
     />
   );
 }
