@@ -39,7 +39,7 @@ export default function Report() {
             <div className="absolute inset-0 border-2 border-transparent border-t-accent rounded-full animate-spin" />
           </div>
           <span className="text-[10px] text-text-muted tracking-[0.3em] uppercase font-mono">
-            Loading report
+            Decrypting dossier
           </span>
         </div>
       </div>
@@ -51,65 +51,24 @@ export default function Report() {
     return null;
   }
 
-  const { investigation, findings } = data;
+  const { investigation, findings, steps } = data;
 
   return (
-    <div className="min-h-screen bg-bg-primary">
-      {/* Header */}
-      <motion.header
-        initial={{ opacity: 0, y: -8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4 }}
-        className="border-b border-border px-6"
-      >
-        <div className="flex items-center h-14">
-          {/* Logo */}
-          <a
-            href="/"
-            className="relative w-8 h-8 rounded-lg bg-accent/10 border border-accent/20 flex items-center justify-center group hover:bg-accent/15 transition-colors"
-          >
-            <span className="font-display font-bold text-accent text-xs">
-              T
-            </span>
-            <div className="absolute -top-px -left-px w-2 h-2 border-t border-l border-accent/40" />
-            <div className="absolute -bottom-px -right-px w-2 h-2 border-b border-r border-accent/40" />
-          </a>
-
-          <div className="h-4 w-px bg-border mx-3" />
-
-          {/* Subject name */}
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] text-text-muted tracking-wider uppercase font-mono">
-              Subject
-            </span>
-            <span className="text-sm text-text-primary font-display font-medium">
-              {investigation.targetName}
-            </span>
-          </div>
-
-          {/* COMPLETE badge */}
-          <div className="ml-auto flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-accent" />
-            <span className="text-[10px] font-bold tracking-[0.2em] text-accent">
-              COMPLETE
-            </span>
-          </div>
-        </div>
-      </motion.header>
-
-      {/* Report content */}
-      <motion.main
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.1 }}
-      >
-        <DetectiveReport
-          report={investigation.report || ""}
-          targetName={investigation.targetName}
-          confidence={investigation.confidence}
-          findings={findings || []}
-        />
-      </motion.main>
-    </div>
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.5 }}
+    >
+      <DetectiveReport
+        report={investigation.report || ""}
+        targetName={investigation.targetName}
+        confidence={investigation.confidence}
+        findings={findings || []}
+        steps={steps || []}
+        caseId={id || ""}
+        completedAt={investigation.completedAt}
+        estimatedCost={investigation.estimatedCost}
+      />
+    </motion.div>
   );
 }
