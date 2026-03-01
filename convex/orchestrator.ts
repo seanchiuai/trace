@@ -27,7 +27,7 @@ function buildSystemPrompt(maigretAvailable: boolean, extremeMode: boolean = fal
   }
   if (isEnabled(TOOL_NAMES.BROWSER_ACTION)) {
     toolLines.push(
-      `${n++}. browser_action(instruction) - Control a real browser. Returns page text. SLOW (~60-180s) and LIMITED to ${MAX_BROWSER_ACTIONS} uses per investigation. See BROWSER RULES and LOGIN WALL AVOIDANCE below.`
+      `${n++}. browser_action(instruction) - Control a real browser. Returns page text + visual content descriptions. SLOW (~60-180s) and LIMITED to ${MAX_BROWSER_ACTIONS} uses per investigation. HIGH VALUE for Instagram, TikTok, and visual platforms — use it to browse profiles, photos, location tags, and connections. See BROWSER RULES below.`
     );
   }
   if (isEnabled(TOOL_NAMES.WEB_SEARCH)) {
@@ -67,23 +67,25 @@ function buildSystemPrompt(maigretAvailable: boolean, extremeMode: boolean = fal
 ${toolLines.join("\n")}
 
 ## BROWSER RULES - READ CAREFULLY
-browser_action is your LAST RESORT, not your default. Follow this decision tree:
-1. Can web_search answer this? (LinkedIn profiles, GitHub pages, news articles, public pages) -> Use web_search
-2. Does the page require JavaScript rendering, scrolling, or interaction? -> Use browser_action
-3. Did web_search return no useful results AND you need to see the actual page? -> Use browser_action
-4. Did browser_action just fail/timeout? -> NEVER retry browser. Switch to web_search.
+browser_action controls a REAL browser. Use it strategically — it's slow (~60-180s) but extremely powerful for visual intelligence.
 
-NEVER use browser_action for: LinkedIn, GitHub, Facebook public pages, news articles, Wikipedia - web_search gets the same data 250x faster.
-ONLY use browser_action for: imginn.com (Instagram proxy), urlebird.com (TikTok proxy), pages requiring interaction.
+Decision tree:
+1. Can web_search answer this? (LinkedIn profiles, GitHub pages, news articles) -> Use web_search first
+2. Need to see photos, posts, stories, location tags, or visual content? -> Use browser_action (this is its strength)
+3. Did browser_action just fail/timeout? -> NEVER retry the same page. Try an alternative URL or switch to web_search.
 
-## LOGIN WALL AVOIDANCE
-NEVER visit these sites directly in browser_action - use alternatives:
-- Instagram -> imginn.com/username or picuki.com/profile/username (public viewer, no login)
-- TikTok -> urlebird.com/user/username (public viewer, no login)
-- Facebook -> web_search "site:facebook.com name" for cached data; or mbasic.facebook.com/username
-- LinkedIn -> web_search "site:linkedin.com/in/ name title" (Google caches public profiles; NEVER browse directly)
-- Twitter/X -> nitter.net/username or xcancel.com/username; fall back to web_search "site:x.com username"
-- Pinterest -> web_search "site:pinterest.com username"; or browse pinterest.com/username/ (usually public)
+BEST uses of browser_action: Instagram profiles (photos, location tags, tagged people, stories), TikTok profiles, any page with visual/interactive content.
+AVOID browser_action for: LinkedIn, GitHub, Wikipedia, news articles - web_search gets the same text data faster.
+
+## SOCIAL MEDIA BROWSING
+Instagram is HIGH VALUE for investigations — browse it directly:
+- instagram.com/username — public profiles show photos, location tags, tagged people, bio links, stories highlights. Scroll through posts looking for locations, faces, connections.
+- If instagram.com shows a login wall, fall back to: imginn.com/username or picuki.com/profile/username
+- TikTok -> urlebird.com/user/username (public viewer) or browse tiktok.com/@username directly
+- Facebook -> mbasic.facebook.com/username or web_search "site:facebook.com name"
+- LinkedIn -> web_search "site:linkedin.com/in/ name title" (NEVER browse directly, login wall is strict)
+- Twitter/X -> browse x.com/username directly, or nitter.net/username as fallback
+- Pinterest -> browse pinterest.com/username/ (usually public)
 - Reddit -> old.reddit.com/user/username (no login needed)
 
 ## PARALLEL EXECUTION
@@ -105,7 +107,8 @@ ${extremeMode && isEnabled(TOOL_NAMES.DARKWEB_SEARCH) ? "- Email/username -> dar
 
 **Phase 2 - Follow Leads (Steps 6-14):**
 - Cross-reference findings: verify identities across platforms
-- Explore confirmed profiles deeper (web_search first, browser only if needed)
+- Browse confirmed Instagram/TikTok profiles with browser_action — look at photos for locations, faces, tagged people, bio links
+- Explore confirmed profiles deeper (web_search for text-heavy sites, browser_action for visual platforms like Instagram)
 - Search for connections between discovered accounts
 - Target demographics: younger -> TikTok/Instagram/Discord; professional -> LinkedIn/GitHub
 
@@ -254,7 +257,7 @@ const TOOL_DEFINITIONS = [
       properties: {
         instruction: {
           type: "string",
-          description: 'What to do in the browser, e.g. "Go to imginn.com/johndoe and describe what you see"',
+          description: 'What to do in the browser, e.g. "Go to instagram.com/johndoe and describe their photos, location tags, bio, and tagged people"',
         },
       },
       required: ["instruction"],
