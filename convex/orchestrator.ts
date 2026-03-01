@@ -296,16 +296,26 @@ export const step = internalAction({
       hasNonSaveFinding = true;
       const baseStep = (await ctx.runQuery(api.investigations.get, { id: args.investigationId }))?.stepCount ?? currentStepNumber;
 
+      const toolNames = expensiveCalls.map(tc => tc.tool).join(", ");
+      console.log(`[parallel-tools] Starting ${expensiveCalls.length} tools in parallel: ${toolNames}`);
+      const parallelStart = Date.now();
+
       const parallelResults = await Promise.all(
-        expensiveCalls.map((tc, i) =>
-          executeToolCall(ctx, {
+        expensiveCalls.map((tc, i) => {
+          const toolStart = Date.now();
+          return executeToolCall(ctx, {
             investigationId: args.investigationId,
             investigation,
             toolCall: tc,
             stepNumber: baseStep + i + 1,
-          }).then(result => ({ id: tc.id, tool: tc.tool, result }))
-        )
+          }).then(result => {
+            console.log(`[parallel-tools] ${tc.tool} finished in ${((Date.now() - toolStart) / 1000).toFixed(1)}s`);
+            return { id: tc.id, tool: tc.tool, result };
+          });
+        })
       );
+      console.log(`[parallel-tools] All ${expensiveCalls.length} tools finished in ${((Date.now() - parallelStart) / 1000).toFixed(1)}s (would have been sequential: sum of individual times)`);
+
       toolResults.push(...parallelResults);
       currentStepNumber = baseStep + expensiveCalls.length;
     }
