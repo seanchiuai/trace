@@ -297,62 +297,69 @@ export default function Investigation() {
       </AnimatePresence>
 
       {/* Main content — fixed to viewport height */}
-      <div className="flex-1 min-h-0 flex flex-col">
-        <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[1fr_420px]">
-          {/* Left: Browser view */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.5, delay: 0.1 }}
-            className="border-r border-border min-h-0 relative"
-          >
-            <BrowserView
-              liveUrl={investigation.browserLiveUrl}
-              status={investigation.status}
+      <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[1fr_420px]">
+        {/* Left: Browser view OR Report */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.5, delay: 0.1 }}
+          className="border-r border-border min-h-0 relative overflow-hidden"
+        >
+          <AnimatePresence mode="wait">
+            {investigation.status === "complete" && investigation.report ? (
+              <motion.div
+                key="report"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.5, ease: "easeOut" }}
+                className="h-full overflow-y-auto"
+              >
+                <DetectiveReport
+                  report={investigation.report}
+                  targetName={investigation.targetName}
+                  confidence={investigation.confidence}
+                  findings={findings || []}
+                />
+              </motion.div>
+            ) : (
+              <motion.div
+                key="browser"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.3 }}
+                className="h-full"
+              >
+                <BrowserView
+                  liveUrl={investigation.browserLiveUrl}
+                  status={investigation.status}
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </motion.div>
+
+        {/* Right: Activity + Findings */}
+        <motion.div
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.5, delay: 0.2 }}
+          className="flex flex-col min-h-0 overflow-hidden"
+        >
+          {/* Activity Stream */}
+          <div className="flex-1 min-h-0 border-b border-border">
+            <ActivityStream
+              steps={steps || []}
+              isLive={investigation.status === "investigating" || investigation.status === "planning" || investigation.status === "analyzing"}
             />
-          </motion.div>
+          </div>
 
-          {/* Right: Activity + Findings */}
-          <motion.div
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.5, delay: 0.2 }}
-            className="flex flex-col min-h-0 overflow-hidden"
-          >
-            {/* Activity Stream */}
-            <div className="flex-1 min-h-0 border-b border-border">
-              <ActivityStream
-                steps={steps || []}
-                isLive={investigation.status === "investigating" || investigation.status === "planning" || investigation.status === "analyzing"}
-              />
-            </div>
-
-            {/* Findings */}
-            <div className="h-72 lg:h-80 overflow-y-auto shrink-0">
-              <FindingsGrid findings={findings || []} />
-            </div>
-          </motion.div>
-        </div>
-
-        {/* Report section — scrollable below the fold when investigation completes */}
-        <AnimatePresence>
-          {investigation.status === "complete" && investigation.report && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.6, ease: "easeOut" }}
-              className="border-t border-accent/20 overflow-y-auto"
-            >
-              <DetectiveReport
-                report={investigation.report}
-                targetName={investigation.targetName}
-                confidence={investigation.confidence}
-                findings={findings || []}
-              />
-            </motion.div>
-          )}
-        </AnimatePresence>
+          {/* Findings */}
+          <div className="h-72 lg:h-80 overflow-y-auto shrink-0">
+            <FindingsGrid findings={findings || []} />
+          </div>
+        </motion.div>
       </div>
     </div>
   );
