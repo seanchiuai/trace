@@ -24,7 +24,7 @@ export const search = internalAction({
     query: v.string(),
     searchType: v.string(),
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<{ query: string; searchType: string; rawOutput: string; source: string }> => {
     const email = process.env.DEHASHED_EMAIL;
     const password = process.env.DEHASHED_PASSWORD;
 
