@@ -7,98 +7,124 @@ description: Browser Use Cloud API integration for autonomous web browsing
 
 ## Overview
 
-Browser Use Cloud provides "dumb hands" for the AI investigator. The orchestrator (Opus) sends natural language instructions, Browser Use executes them in a cloud browser, and returns screenshots + extracted page text. The user can watch via a live iframe.
+Browser Use Cloud provides "dumb hands" for the AI investigator. The orchestrator (Opus) sends natural language instructions, Browser Use executes them in a cloud browser, and returns extracted page text. The user can watch via a live iframe.
 
 ## API
 
-Base URL: `https://api.browser-use.com/api/v1`
+Base URL: `https://api.browser-use.com/api/v2`
 
-Auth: `Authorization: Bearer {BROWSER_USE_API_KEY}`
+Auth: `X-Browser-Use-API-Key: {BROWSER_USE_API_KEY}`
 
 ### Endpoints Used
 
 | Endpoint | Method | Purpose |
 |----------|--------|---------|
 | `/sessions` | POST | Create a new browser session |
-| `/run-task` | POST | Execute a natural language browser action |
-| `/task/{taskId}` | GET | Poll task status |
+| `/sessions/{sessionId}` | GET | Fetch session details (includes `liveUrl`) |
+| `/sessions/{sessionId}` | PATCH | Stop a session (`{ action: "stop" }`) |
+| `/tasks` | POST | Create and execute a natural language browser task |
+| `/tasks/{taskId}` | GET | Poll task status until finished/failed |
 
 ### Task Execution
 
 ```typescript
 // convex/tools/browserUse.ts — runTask
-const body = {
-  task: "Go to instagram.com/johndoe123 and describe what you see",
-  session_id: existingSessionId,  // optional, reuses session
-};
+// Step 1: Create the task
+const body: Record<string, unknown> = { task: "Go to instagram.com/johndoe123 and describe what you see" };
+if (existingSessionId) {
+  body.session_id = existingSessionId;  // reuses session
+}
 
-const res = await fetch(`${API}/run-task`, {
+const createRes = await fetch(`${API}/tasks`, {
   method: "POST",
-  headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+  headers: { "X-Browser-Use-API-Key": apiKey, "Content-Type": "application/json" },
   body: JSON.stringify(body),
 });
+const created = await createRes.json();
+const taskId = created.id;
+
+// Step 2: Poll until finished/failed (max 120 attempts x 2s = 4 min)
+const pollRes = await fetch(`${API}/tasks/${taskId}`, {
+  headers: { "X-Browser-Use-API-Key": apiKey },
+});
+const task = await pollRes.json();
+// task.status === "finished" | "failed"
 ```
 
 ### Response Shape
 
 ```typescript
+// Task creation response
 {
-  task_id: string;
-  session_id: string;
-  live_url: string;       // iframe-embeddable URL for live viewing
-  status: "running" | "completed" | "failed";
-  result: {
-    screenshot: string;   // base64 or URL
-    page_text: string;    // extracted text content
-    url: string;          // current page URL
-  };
+  id: string;           // task ID for polling
+}
+
+// Task poll response (when finished)
+{
+  id: string;
+  status: "finished" | "failed";
+  output: string;       // extracted text content from the browser
+  sessionId: string;    // session used
+  error?: string;       // present if failed
+}
+
+// Session response
+{
+  id: string;
+  liveUrl: string;      // iframe-embeddable URL for live viewing
 }
 ```
 
 ## Integration with Orchestrator
 
-1. Opus decides to browse: `browser_action("Go to instagram.com/johndoe123")`
-2. Orchestrator calls `internal.tools.browserUse.runTask`
-3. Response includes `session_id` and `live_url`
-4. Orchestrator stores these on the investigation record via `updateBrowserSession`
+1. `startInvestigation` eagerly creates a browser session via `createSession` so the live URL appears immediately
+2. Session `id` and `liveUrl` are stored on the investigation record via `updateBrowserSession`
+3. Opus decides to browse: `browser_action("Go to instagram.com/johndoe123")`
+4. Orchestrator calls `internal.tools.browserUse.runTask` (passes `sessionId` if available)
 5. Frontend picks up `browserLiveUrl` and renders it in `BrowserView` iframe
-6. Opus gets the result text back and reasons about what it saw
+6. Opus gets the `output` text back and reasons about what it saw
+7. On investigation completion/failure, `cleanupBrowserSession` stops the session via `stopSession`
 
 ## Frontend: BrowserView Component
 
 `src/components/BrowserView.tsx`
 
-- Empty state: globe icon + "Waiting for browser session"
-- Connecting state: green pulse + "Connecting to browser..."
+- Empty state (planning): globe icon + "Waiting for investigation to start..."
+- Connecting state (investigating, no URL yet): green pulse + "Connecting to browser..."
 - Active state: URL bar (green dot + "LIVE" badge) + full-height iframe
 
 ```tsx
 <iframe
   src={liveUrl}
   className="flex-1 w-full bg-black"
-  sandbox="allow-same-origin allow-scripts"
+  title="Browser Use Live View"
+  sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
 />
 ```
 
 ## Convex Implementation
 
-All three endpoints are `internalAction` — only callable by the orchestrator, never from the frontend.
+All five functions are `internalAction` — only callable by the orchestrator, never from the frontend.
 
-| Function | File | Visibility |
-|----------|------|-----------|
-| `createSession` | `convex/tools/browserUse.ts` | internal |
-| `runTask` | `convex/tools/browserUse.ts` | internal |
-| `getTaskStatus` | `convex/tools/browserUse.ts` | internal |
+| Function | File | Purpose |
+|----------|------|---------|
+| `createSession` | `convex/tools/browserUse.ts` | Create a new browser session |
+| `runTask` | `convex/tools/browserUse.ts` | Create task + poll until finished (up to 4 min) |
+| `getTaskStatus` | `convex/tools/browserUse.ts` | Check status of a specific task |
+| `getSession` | `convex/tools/browserUse.ts` | Fetch session details (for `liveUrl`) |
+| `stopSession` | `convex/tools/browserUse.ts` | Stop a session (PATCH with `{ action: "stop" }`) |
 
 ## Session Persistence
 
 The `browserSessionId` and `browserLiveUrl` are stored on the investigation record so:
 - Subsequent browser actions reuse the same session (maintains cookies, state)
 - The frontend can display the live URL at any time
+- Session is cleaned up when the investigation completes or fails
 
 ## Gotchas
 
 - **Session reuse**: Always pass `session_id` for subsequent tasks to maintain login state
-- **iframe sandbox**: `allow-same-origin allow-scripts` needed for Browser Use player
+- **iframe sandbox**: `allow-same-origin allow-scripts allow-forms allow-popups` needed for Browser Use player
 - **CORS**: Browser Use live URLs should be embeddable — if not, may need to proxy
-- **Task timeout**: Individual tasks are short (15-30s each). Long browsing sessions are split across multiple task calls by the orchestrator
+- **Polling timeout**: `runTask` polls up to 120 attempts x 2s = 4 minutes max per task
+- **404 on stop**: `stopSession` treats 404 as success — session may already be gone

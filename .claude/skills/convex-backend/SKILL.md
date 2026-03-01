@@ -15,9 +15,9 @@ Three tables in `convex/schema.ts`:
 
 | Table | Purpose | Key Fields |
 |-------|---------|------------|
-| `investigations` | Root record for each investigation | `targetName`, `status`, `stepCount`, `report`, `browserLiveUrl` |
-| `findings` | Individual evidence items discovered | `investigationId` (FK), `source`, `category`, `confidence` |
-| `steps` | Activity log for real-time frontend stream | `investigationId` (FK), `stepNumber`, `tool`, `action`, `result` |
+| `investigations` | Root record for each investigation | `targetName`, `targetDescription`, `targetPhone`, `targetPhoto`, `knownLinks`, `status`, `stepCount`, `browserSessionId`, `browserLiveUrl`, `report`, `confidence`, `createdAt`, `completedAt` |
+| `findings` | Individual evidence items discovered | `investigationId` (FK), `source`, `category`, `platform`, `profileUrl`, `imageUrl`, `data`, `confidence`, `createdAt` |
+| `steps` | Activity log for real-time frontend stream | `investigationId` (FK), `stepNumber`, `action`, `tool`, `result`, `screenshot`, `createdAt` |
 
 ### Investigation Status Flow
 
@@ -45,7 +45,7 @@ planning → investigating → analyzing → complete
 - **Public** (`action`, `mutation`, `query`): Callable from frontend via `api.*`
 - **Internal** (`internalAction`, `internalMutation`): Only callable from other Convex functions via `internal.*`
 
-Tool implementations (`convex/tools/*.ts`) use `internalAction` — they're only called by the orchestrator, never directly from the frontend.
+Most tool implementations (`convex/tools/*.ts`) use `internalAction` — they're only called by the orchestrator, never directly from the frontend.
 
 ## Key Patterns
 
@@ -56,6 +56,10 @@ Tool implementations (`convex/tools/*.ts`) use `internalAction` — they're only
 const id = await ctx.db.insert("investigations", {
   query: `Investigate ${args.targetName}`,
   targetName: args.targetName,
+  targetDescription: args.targetDescription,
+  targetPhone: args.targetPhone,
+  targetPhoto: args.targetPhoto,
+  knownLinks: args.knownLinks,
   status: "planning",
   stepCount: 0,
   createdAt: Date.now(),
@@ -116,7 +120,7 @@ export const generateUploadUrl = mutation({
 | `convex/investigations.ts` | `create`, `get`, `list`, `updateStatus`, `updateReport`, `updateBrowserSession`, `incrementStep`, `getFindings`, `getSteps`, `addStep`, `addFinding`, `generateUploadUrl` | All investigation CRUD |
 | `convex/orchestrator.ts` | `startInvestigation` (action), `step` (internalAction) | Opus agentic loop |
 | `convex/reports.ts` | `getReport` | Assembles investigation + findings + steps |
-| `convex/tools/*.ts` | Tool-specific internalActions | External API integrations |
+| `convex/tools/*.ts` | Tool-specific actions/internalActions | External API integrations |
 
 ## Environment Variables
 
@@ -125,6 +129,7 @@ Set in Convex dashboard (Settings → Environment Variables), NOT in `.env`:
 - `ANTHROPIC_API_KEY` — Claude API for orchestrator
 - `BROWSER_USE_API_KEY` — Browser Use Cloud
 - `FACECHECK_API_KEY` — FaceCheck.id
+- `MAIGRET_SIDECAR_URL` — Maigret sidecar URL (optional, defaults to `http://localhost:8000`)
 
 ## Gotchas
 

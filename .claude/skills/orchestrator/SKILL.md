@@ -17,6 +17,8 @@ Located in `convex/orchestrator.ts`.
 startInvestigation (public action)
   │
   ├── Sets status to "investigating"
+  ├── Eagerly creates browser session (non-blocking)
+  │     └── Stores sessionId + liveUrl on investigation
   └── scheduler.runAfter(0, step)
         │
         ▼
@@ -33,6 +35,25 @@ startInvestigation (public action)
         └── scheduler.runAfter(0, step) ──────────┘
 ```
 
+## Eager Browser Session
+
+`startInvestigation` creates a browser session before the first step so the live URL appears in the UI immediately:
+
+```typescript
+try {
+  const session = await ctx.runAction(internal.tools.browserUse.createSession, {});
+  if (session?.id && session?.liveUrl) {
+    await ctx.runMutation(api.investigations.updateBrowserSession, {
+      id: args.investigationId,
+      browserSessionId: session.id,
+      browserLiveUrl: session.liveUrl,
+    });
+  }
+} catch (e) {
+  console.warn("Eager browser session creation failed (non-blocking):", e);
+}
+```
+
 ## Tools Available to Opus
 
 Defined as Anthropic tool schemas in the `step` function:
@@ -40,7 +61,7 @@ Defined as Anthropic tool schemas in the `step` function:
 | Tool Name | Args | Dispatches To | Returns |
 |-----------|------|---------------|---------|
 | `maigret_search` | `username` | `internal.tools.maigret.search` | Profile URLs + metadata JSON |
-| `browser_action` | `instruction` | `internal.tools.browserUse.runTask` | Screenshot + page text JSON |
+| `browser_action` | `instruction` | `internal.tools.browserUse.runTask` | `output` text from browser |
 | `face_check` | `imageUrl` | `internal.tools.faceCheck.searchByImage` | Matching profiles + scores |
 | `save_finding` | `source, category, data, confidence, platform?, profileUrl?` | `api.investigations.addFinding` | "Finding saved successfully." |
 | `done` | `summary` | `generateReport()` | Ends loop, generates report |
@@ -95,11 +116,32 @@ Triggered by the `done` tool or when `stepCount >= MAX_STEPS`:
 
 1. Fetches all findings for the investigation
 2. Builds a prompt with findings summary
-3. Calls Opus to generate markdown report
+3. Calls Opus to generate markdown report (max_tokens: 4096)
 4. Stores report on investigation record
-5. Sets status to "complete"
+5. Cleans up the browser session via `cleanupBrowserSession`
+6. Sets status to "complete"
 
 Overall confidence = average of all finding confidence scores.
+
+## Browser Session Cleanup
+
+After report generation (or on API failure), the orchestrator cleans up:
+
+```typescript
+async function cleanupBrowserSession(ctx, investigationId) {
+  const investigation = await ctx.runQuery(api.investigations.get, { id: investigationId });
+  if (investigation?.browserSessionId) {
+    await ctx.runAction(internal.tools.browserUse.stopSession, {
+      sessionId: investigation.browserSessionId,
+    });
+    await ctx.runMutation(api.investigations.updateBrowserSession, {
+      id: investigationId,
+      browserSessionId: undefined,
+      browserLiveUrl: undefined,
+    });
+  }
+}
+```
 
 ## System Prompt
 
@@ -116,12 +158,13 @@ The system prompt defines:
 - **Reasoning truncation** — Logged reasoning capped at 500 chars
 - **Error handling** — Tool errors caught and returned as text, don't crash the loop
 - **Terminal states** — Loop exits if status is "complete" or "failed"
+- **API failure** — Cleans up browser session and sets status to "failed"
 
 ## Key Files
 
 | File | What |
 |------|------|
-| `convex/orchestrator.ts` | `startInvestigation`, `step`, `generateReport`, `calculateOverallConfidence` |
-| `convex/tools/browserUse.ts` | `createSession`, `runTask`, `getTaskStatus` |
+| `convex/orchestrator.ts` | `startInvestigation`, `step`, `generateReport`, `cleanupBrowserSession`, `calculateOverallConfidence` |
+| `convex/tools/browserUse.ts` | `createSession`, `runTask`, `getTaskStatus`, `getSession`, `stopSession` |
 | `convex/tools/faceCheck.ts` | `searchByImage`, `extractPlatform` |
-| `convex/tools/maigret.ts` | `search` |
+| `convex/tools/maigret.ts` | `search`, `batchSearch`, `healthCheck` |
