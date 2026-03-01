@@ -51,13 +51,14 @@ export const updateStatus = mutation({
       v.literal("investigating"),
       v.literal("analyzing"),
       v.literal("complete"),
-      v.literal("failed")
+      v.literal("failed"),
+      v.literal("stopped")
     ),
     errorMessage: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const patch: Record<string, unknown> = { status: args.status };
-    if (args.status === "complete") {
+    if (args.status === "complete" || args.status === "stopped") {
       patch.completedAt = Date.now();
     }
     if (args.status === "failed" && args.errorMessage) {
