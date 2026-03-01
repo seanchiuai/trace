@@ -512,7 +512,7 @@ export const step = internalAction({
       return;
     }
 
-    let conversationHistory = JSON.parse(args.conversationHistory);
+    const conversationHistory = JSON.parse(args.conversationHistory);
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) throw new Error("ANTHROPIC_API_KEY not set");
 
@@ -1308,7 +1308,6 @@ ${summaryInput}`,
       const adjustedCutoff = cutoffIndex - 1;
       if (adjustedCutoff <= 1) return { history: conversationHistory };
       const adjustedRecent = conversationHistory.slice(adjustedCutoff);
-      const adjustedSummarize = conversationHistory.slice(1, adjustedCutoff);
       if (adjustedRecent[0]?.role !== "assistant") {
         console.warn("Cannot ensure assistant-first alternation after compression, skipping");
         return { history: conversationHistory };
