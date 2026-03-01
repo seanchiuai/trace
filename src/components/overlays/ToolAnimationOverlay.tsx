@@ -46,7 +46,7 @@ export default function ToolAnimationOverlay({ activeTool, stepId }: Props) {
   if (reducedMotion) return null;
 
   return (
-    <div className="absolute inset-0 z-5 pointer-events-none">
+    <div className="absolute inset-0 z-[15] pointer-events-none">
       <AnimatePresence mode="wait">
         {OverlayComponent && stepId && (
           <motion.div
