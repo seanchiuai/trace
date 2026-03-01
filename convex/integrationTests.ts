@@ -91,7 +91,9 @@ export const testPicarta = action({
       // Download ourselves and send as base64 — Picarta can't fetch many URLs server-side
       const testUrl =
         "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a8/Tour_Eiffel_Wikimedia_Commons.jpg/256px-Tour_Eiffel_Wikimedia_Commons.jpg";
-      const imgRes = await fetch(testUrl);
+      const imgRes = await fetch(testUrl, {
+        headers: { "User-Agent": "TRACE-Investigation/1.0" },
+      });
       if (!imgRes.ok) {
         return { success: false, error: `Failed to download test image (${imgRes.status})` };
       }

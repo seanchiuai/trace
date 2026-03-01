@@ -15,7 +15,9 @@ export const localize = internalAction({
 
     // Download image ourselves and send as base64 — Picarta's server-side
     // URL fetching fails for many hosts (Wikimedia, social media CDNs, etc.)
-    const imgRes = await fetch(args.imageUrl);
+    const imgRes = await fetch(args.imageUrl, {
+      headers: { "User-Agent": "TRACE-Investigation/1.0" },
+    });
     if (!imgRes.ok) {
       throw new Error(`Failed to download image (${imgRes.status}): ${args.imageUrl}`);
     }
