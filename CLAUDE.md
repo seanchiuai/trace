@@ -22,6 +22,8 @@ cd sidecar && pip install -r requirements.txt && python server.py
 - **Convex** — Backend (schema, mutations, queries, actions, scheduler)
 - **Framer Motion** — Animations
 - **React Router DOM 7** — Client-side routing
+- **Leaflet** + **React Leaflet 5** — Geographic map rendering
+- **react-force-graph-2d** — Force-directed graph visualization
 - **Anthropic API** (Claude Sonnet for agentic loop, Opus for reports) — Orchestrator LLM
 - **Browser Use API** — Cloud browser automation
 - **Maigret** — Username OSINT (Python sidecar via FastAPI)
@@ -50,7 +52,8 @@ src/
 │   ├── HudHeader.tsx        # Investigation HUD header
 │   ├── CommandStrip.tsx     # Command strip + stop button
 │   ├── FindingToasts.tsx    # Real-time finding notifications
-│   └── CompletionFlash.tsx  # Investigation completion animation
+│   ├── CompletionFlash.tsx  # Investigation completion animation
+│   └── ClarificationCard.tsx # User clarification/directive input
 ├── pages/
 │   ├── Home.tsx             # Landing + form
 │   ├── Runs.tsx             # All investigations list
@@ -63,6 +66,8 @@ convex/
 ├── investigations.ts    # CRUD + queries
 ├── orchestrator.ts      # Agentic loop (Sonnet for steps, Opus for reports)
 ├── reports.ts           # Report assembly
+├── graphEdges.ts        # Graph edge CRUD (connection network)
+├── directives.ts        # User directives/clarifications during investigation
 └── tools/
     ├── braveSearch.ts       # Brave Search API (fast web lookups)
     ├── browserUse.ts        # Browser Use Cloud API v3
