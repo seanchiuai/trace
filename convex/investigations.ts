@@ -8,6 +8,7 @@ export const create = mutation({
     targetPhone: v.optional(v.string()),
     targetPhoto: v.optional(v.string()),
     knownLinks: v.array(v.string()),
+    extremeMode: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const id = await ctx.db.insert("investigations", {
@@ -17,6 +18,7 @@ export const create = mutation({
       targetPhone: args.targetPhone,
       targetPhoto: args.targetPhoto,
       knownLinks: args.knownLinks,
+      extremeMode: args.extremeMode,
       status: "planning",
       stepCount: 0,
       createdAt: Date.now(),
@@ -158,6 +160,8 @@ export const addFinding = mutation({
     imageUrl: v.optional(v.string()),
     data: v.string(),
     confidence: v.number(),
+    latitude: v.optional(v.number()),
+    longitude: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     return await ctx.db.insert("findings", {
@@ -189,6 +193,39 @@ export const updateTokenUsage = mutation({
       totalInputTokens: totalInput,
       totalOutputTokens: totalOutput,
       estimatedCost: Math.round(totalCost * 10000) / 10000,
+    });
+  },
+});
+
+export const addSteps = mutation({
+  args: {
+    steps: v.array(
+      v.object({
+        investigationId: v.id("investigations"),
+        stepNumber: v.number(),
+        action: v.string(),
+        tool: v.string(),
+        result: v.optional(v.string()),
+        screenshot: v.optional(v.string()),
+      })
+    ),
+  },
+  handler: async (ctx, args) => {
+    const now = Date.now();
+    for (const step of args.steps) {
+      await ctx.db.insert("steps", { ...step, createdAt: now });
+    }
+  },
+});
+
+export const updateBehavioralAnalysis = mutation({
+  args: {
+    id: v.id("investigations"),
+    behavioralAnalysis: v.string(),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.id, {
+      behavioralAnalysis: args.behavioralAnalysis,
     });
   },
 });

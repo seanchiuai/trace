@@ -68,6 +68,7 @@ export default function Report() {
         caseId={id || ""}
         completedAt={investigation.completedAt}
         estimatedCost={investigation.estimatedCost}
+        behavioralAnalysis={investigation.behavioralAnalysis}
       />
     </motion.div>
   );

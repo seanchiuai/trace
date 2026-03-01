@@ -44,6 +44,30 @@ export const TOOL_CONFIG: Record<
     bg: "bg-orange-400/10",
     border: "border-orange-400/20",
   },
+  geospy: {
+    letter: "G",
+    color: "text-green-400",
+    bg: "bg-green-400/10",
+    border: "border-green-400/20",
+  },
+  whitepages: {
+    letter: "P",
+    color: "text-red-400",
+    bg: "bg-red-400/10",
+    border: "border-red-400/20",
+  },
+  reverse_image: {
+    letter: "I",
+    color: "text-pink-400",
+    bg: "bg-pink-400/10",
+    border: "border-pink-400/20",
+  },
+  darkweb: {
+    letter: "D",
+    color: "text-red-500",
+    bg: "bg-red-500/10",
+    border: "border-red-500/20",
+  },
 };
 
 export function ToolBadge({ tool, size = "md" }: { tool: string; size?: "sm" | "md" }) {

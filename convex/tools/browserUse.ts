@@ -79,14 +79,19 @@ export const runTask = internalAction({
   args: {
     task: v.string(),
     sessionId: v.optional(v.string()),
-    investigationId: v.optional(v.id("investigations")),
+    investigationId: v.optional(v.string()),
+    extremeMode: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const body: Record<string, unknown> = {
       task: args.task,
-      model: "bu-mini",
       keepAlive: true,
     };
+
+    // Use premium model in extreme mode for +12% accuracy
+    if (args.extremeMode) {
+      body.model = "bu-2-0";
+    }
 
     // --- Session reuse: wait for idle or drop ---
     if (args.sessionId) {
@@ -97,6 +102,7 @@ export const runTask = internalAction({
         console.warn(
           `Session ${args.sessionId} not reusable (${check.reason}), creating fresh session`,
         );
+        // Don't set sessionId — POST /sessions will create a new one
       }
     }
 
@@ -143,7 +149,7 @@ export const runTask = internalAction({
     if (liveUrl && args.investigationId) {
       try {
         await ctx.runMutation(api.investigations.updateBrowserSession, {
-          id: args.investigationId,
+          id: args.investigationId as any,
           browserSessionId: sessionId,
           browserLiveUrl: liveUrl,
         });
@@ -195,7 +201,7 @@ export const runTask = internalAction({
         if (args.investigationId) {
           try {
             await ctx.runMutation(api.investigations.updateBrowserSession, {
-              id: args.investigationId,
+              id: args.investigationId as any,
               browserSessionId: sessionId,
               browserLiveUrl: liveUrl,
             });

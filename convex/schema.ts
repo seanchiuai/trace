@@ -20,6 +20,7 @@ export default defineSchema({
     browserLiveUrl: v.optional(v.string()),
     report: v.optional(v.string()),
     confidence: v.optional(v.number()),
+    extremeMode: v.optional(v.boolean()),
     errorMessage: v.optional(v.string()),
     stepCount: v.number(),
     totalInputTokens: v.optional(v.number()),
@@ -27,6 +28,7 @@ export default defineSchema({
     estimatedCost: v.optional(v.number()),
     createdAt: v.number(),
     completedAt: v.optional(v.number()),
+    behavioralAnalysis: v.optional(v.string()),
   }),
 
   findings: defineTable({
@@ -38,6 +40,8 @@ export default defineSchema({
     imageUrl: v.optional(v.string()),
     data: v.string(),
     confidence: v.number(),
+    latitude: v.optional(v.number()),
+    longitude: v.optional(v.number()),
     createdAt: v.number(),
   }).index("by_investigation", ["investigationId"]),
 
@@ -48,6 +52,25 @@ export default defineSchema({
     tool: v.string(),
     result: v.optional(v.string()),
     screenshot: v.optional(v.string()),
+    createdAt: v.number(),
+  }).index("by_investigation", ["investigationId"]),
+
+  graph_edges: defineTable({
+    investigationId: v.id("investigations"),
+    fromLabel: v.string(),
+    toLabel: v.string(),
+    fromType: v.string(),
+    toType: v.string(),
+    edgeType: v.union(
+      v.literal("follows"),
+      v.literal("mentioned_by"),
+      v.literal("same_username"),
+      v.literal("found_via"),
+      v.literal("located_at")
+    ),
+    platform: v.optional(v.string()),
+    reason: v.optional(v.string()),
+    confidence: v.number(),
     createdAt: v.number(),
   }).index("by_investigation", ["investigationId"]),
 });

@@ -13,7 +13,7 @@ function estimateTokens(text: string): number {
   return Math.ceil(text.length / 3.5);
 }
 
-function buildSystemPrompt(maigretAvailable: boolean): string {
+function buildSystemPrompt(maigretAvailable: boolean, extremeMode: boolean = false): string {
   const toolLines: string[] = [];
   let n = 1;
   if (maigretAvailable) {
@@ -24,7 +24,17 @@ function buildSystemPrompt(maigretAvailable: boolean): string {
   toolLines.push(
     `${n++}. browser_action(instruction) — Control a web browser. Give clear instructions like "Go to imginn.com/username and report what you see." IMPORTANT: For Instagram profiles, ALWAYS use imginn.com (e.g. imginn.com/username) instead of instagram.com — it shows public profiles without login walls. Returns screenshots and page text. Use for interactive pages that require scrolling or JS rendering. EXPENSIVE — prefer web_search for simple lookups.`,
     `${n++}. web_search(query, count?) — Fast web search. Returns titles, URLs, and snippets. Use this FIRST for simple lookups like "John Smith LinkedIn", "username site:twitter.com", company info, news articles, etc. Much faster and cheaper than browser_action.`,
+    `${n++}. geospy_predict(imageUrl) — AI photo geolocation. Upload a photo URL and get predicted GPS coordinates, city, country, and an explanation of the visual clues used. Use on any image that might reveal a location (street views, landmarks, scenery).`,
     `${n++}. geo_locate(imageUrl) — AI geolocation via Picarta: analyzes an image and predicts WHERE it was taken (city, state, country, GPS coordinates) based on visual clues. Returns coordinates, confidence score, EXIF metadata, and top-3 predictions. Use on any photo with visible backgrounds, landmarks, or architecture.`,
+    `${n++}. reverse_image_search(imageUrl) — Reverse image search. Find where a photo appears online — social profiles, news articles, blogs. Returns visual matches, knowledge graph identity, and text in the image.`
+  );
+  if (extremeMode) {
+    toolLines.push(
+      `${n++}. whitepages_lookup(name?, phone?, city?, stateCode?) — Deep person lookup using WhitePages. Search by name, phone number, or both. Returns real addresses (with lat/lng), age range, phone numbers, and associated people. Use when you have a name or phone number and need real-world identity data.`,
+      `${n++}. darkweb_search(term, maxResults?) — Search dark web, leaked databases, and paste sites. Find breach records, leaked credentials, and data dump mentions for an email, username, phone, or domain. Use to uncover hidden connections or verify identities.`
+    );
+  }
+  toolLines.push(
     `${n++}. save_finding(source, category, platform, data, confidence, imageUrl?, profileUrl?) — Save a confirmed finding. Categories: "social", "connection", "location", "activity", "identity". FREE — does not count toward your step budget. Save findings liberally as you discover them. IMPORTANT: When you find profile photos, post images, or any visual evidence, ALWAYS include the imageUrl. On imginn.com, image URLs look like "https://imginn.com/p/..." or CDN URLs from the page.`,
     `${n++}. done(report) — End the investigation and generate the final report.`
   );
@@ -35,9 +45,12 @@ function buildSystemPrompt(maigretAvailable: boolean): string {
       ? [`  - Username known → start with maigret_search to cast a wide OSINT net`]
       : []),
     `  - Only a name → use web_search to find usernames, profiles, and leads first`,
-    `  - Photo available → use web_search with image-related queries to find visual matches`,
+    `  - Photo available → use geospy_predict to geolocate the photo; use reverse_image_search to find where it appears online`,
     `  - Social links provided → explore those profiles directly (web_search or browser_action)`,
-    `  - Phone number → search it via web_search`,
+    `  - Phone number → search it via web_search${extremeMode ? "; also use whitepages_lookup for deep identity data" : ""}`,
+    ...(extremeMode
+      ? [`  - Email/username known → use darkweb_search to check for leaked records, breach data, and paste site mentions`]
+      : []),
     `- Consider the target type and pick platforms accordingly:`,
     `  - Younger person → prioritize TikTok, Instagram, Snapchat, Discord`,
     `  - Professional → prioritize LinkedIn, GitHub, company pages`,
@@ -108,6 +121,21 @@ const TOOL_DEFINITIONS = [
     },
   },
   {
+    name: "geospy_predict",
+    description:
+      "AI geolocation — upload a photo and get predicted GPS coordinates, city, country, and an explanation of visual clues. Use on any photo that might reveal a location.",
+    input_schema: {
+      type: "object",
+      properties: {
+        imageUrl: {
+          type: "string",
+          description: "URL of the image to geolocate",
+        },
+      },
+      required: ["imageUrl"],
+    },
+  },
+  {
     name: "geo_locate",
     description:
       "AI geolocation via Picarta: analyzes an image and predicts WHERE it was taken based on visual clues. Returns city, country, GPS coordinates, confidence score, top-3 predictions, and EXIF metadata.",
@@ -117,6 +145,54 @@ const TOOL_DEFINITIONS = [
         imageUrl: { type: "string", description: "URL of the image to geo-locate" },
       },
       required: ["imageUrl"],
+    },
+  },
+  {
+    name: "whitepages_lookup",
+    description:
+      "Deep person lookup — search by name, phone number, or both. Returns real addresses, age, phone numbers, and associated people. EXTREME MODE ONLY.",
+    input_schema: {
+      type: "object",
+      properties: {
+        name: { type: "string", description: "Full name to search" },
+        phone: { type: "string", description: "Phone number to search" },
+        city: { type: "string", description: "City to narrow results" },
+        stateCode: { type: "string", description: "Two-letter state code" },
+      },
+    },
+  },
+  {
+    name: "reverse_image_search",
+    description:
+      "Reverse image search — find where a photo appears online. Returns visual matches (pages containing the image), knowledge graph identity, and text found in/near the image. Use on any photo of the target to find social profiles, news articles, or other appearances.",
+    input_schema: {
+      type: "object",
+      properties: {
+        imageUrl: {
+          type: "string",
+          description: "URL of the image to reverse search",
+        },
+      },
+      required: ["imageUrl"],
+    },
+  },
+  {
+    name: "darkweb_search",
+    description:
+      "Search dark web, leaked databases, and paste sites for mentions of an email, username, phone number, or domain. Returns breach records, paste appearances, and leaked data references. EXTREME MODE ONLY.",
+    input_schema: {
+      type: "object",
+      properties: {
+        term: {
+          type: "string",
+          description: "Email, username, phone number, or domain to search for in leaked/dark web data",
+        },
+        maxResults: {
+          type: "number",
+          description: "Maximum results to return (default 10, max 20)",
+        },
+      },
+      required: ["term"],
     },
   },
   {
@@ -179,6 +255,8 @@ export const startInvestigation = action({
     else
       infoLines.push(`No photo provided`);
 
+    const extremeMode = investigation.extremeMode ?? false;
+
     await ctx.scheduler.runAfter(0, internal.orchestrator.step, {
       investigationId: args.investigationId,
       conversationHistory: JSON.stringify([{
@@ -187,6 +265,7 @@ export const startInvestigation = action({
       }]),
       consecutiveSaveOnlySteps: 0,
       maigretAvailable,
+      extremeMode,
     });
   },
 });
@@ -197,6 +276,7 @@ export const step = internalAction({
     conversationHistory: v.string(),
     consecutiveSaveOnlySteps: v.optional(v.number()),
     maigretAvailable: v.optional(v.boolean()),
+    extremeMode: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const investigation = await ctx.runQuery(api.investigations.get, { id: args.investigationId });
@@ -212,9 +292,13 @@ export const step = internalAction({
     if (!apiKey) throw new Error("ANTHROPIC_API_KEY not set");
 
     const maigretAvailable = args.maigretAvailable ?? false;
-    const tools = maigretAvailable
-      ? TOOL_DEFINITIONS
-      : TOOL_DEFINITIONS.filter((t) => t.name !== "maigret_search");
+    const extremeMode = args.extremeMode ?? false;
+    const tools = TOOL_DEFINITIONS.filter((t) => {
+      if (t.name === "maigret_search" && !maigretAvailable) return false;
+      if (t.name === "whitepages_lookup" && !extremeMode) return false;
+      if (t.name === "darkweb_search" && !extremeMode) return false;
+      return true;
+    });
 
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -224,9 +308,9 @@ export const step = internalAction({
         "content-type": "application/json",
       },
       body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 2048,
-        system: buildSystemPrompt(maigretAvailable),
+        model: "claude-opus-4-20250514",
+        max_tokens: 4096,
+        system: buildSystemPrompt(maigretAvailable, extremeMode),
         messages: conversationHistory,
         tools,
       }),
@@ -267,43 +351,87 @@ export const step = internalAction({
 
     const stepNumber = investigation.stepCount + 1;
 
-    if (reasoning) {
-      await ctx.runMutation(api.investigations.addStep, {
-        investigationId: args.investigationId,
-        stepNumber,
-        action: reasoning.slice(0, 500),
-        tool: "reasoning",
-      });
-    }
+    // Log reasoning step (non-blocking — fire and continue)
+    const reasoningPromise = reasoning
+      ? ctx.runMutation(api.investigations.addStep, {
+          investigationId: args.investigationId,
+          stepNumber,
+          action: reasoning.slice(0, 500),
+          tool: "reasoning",
+        })
+      : Promise.resolve();
 
     if (toolCalls.length === 0) {
+      await reasoningPromise;
       await generateReport(ctx, args.investigationId);
       return;
     }
 
     if (toolCalls.find((tc) => tc.tool === "done")) {
+      await reasoningPromise;
       await generateReport(ctx, args.investigationId);
       return;
     }
 
+    await reasoningPromise;
+
     const toolResults: { id: string; tool: string; result: string }[] = [];
     let hasNonSaveFinding = false;
-    let currentStepNumber = stepNumber;
 
+    // Pre-compute step number — no need to re-query per tool
+    let currentStepNumber = stepNumber;
     for (const tc of toolCalls) {
       if (tc.tool !== "save_finding") {
         hasNonSaveFinding = true;
-        currentStepNumber = (await ctx.runQuery(api.investigations.get, { id: args.investigationId }))?.stepCount ?? currentStepNumber;
-        currentStepNumber += 1;
       }
+    }
+    if (hasNonSaveFinding) {
+      currentStepNumber = stepNumber + 1;
+    }
+
+    // Separate browser_action calls (must be sequential — shared session) from parallelizable tools
+    const browserCalls = toolCalls.filter((tc) => tc.tool === "browser_action");
+    const parallelCalls = toolCalls.filter((tc) => tc.tool !== "browser_action");
+
+    // Execute parallelizable tools concurrently
+    const parallelPromises = parallelCalls.map(async (tc) => {
       const result = await executeToolCall(ctx, {
         investigationId: args.investigationId,
         investigation,
         toolCall: tc,
         stepNumber: currentStepNumber,
+        extremeMode,
       });
-      toolResults.push({ id: tc.id, tool: tc.tool, result });
+      return { id: tc.id, tool: tc.tool, result };
+    });
+
+    // Execute browser_action calls sequentially
+    const browserResults: { id: string; tool: string; result: string }[] = [];
+    for (const tc of browserCalls) {
+      const result = await executeToolCall(ctx, {
+        investigationId: args.investigationId,
+        investigation,
+        toolCall: tc,
+        stepNumber: currentStepNumber,
+        extremeMode,
+      });
+      browserResults.push({ id: tc.id, tool: tc.tool, result });
     }
+
+    const parallelResults = await Promise.allSettled(parallelPromises);
+    parallelResults.forEach((r, i) => {
+      if (r.status === "fulfilled") {
+        toolResults.push(r.value);
+      } else {
+        toolResults.push({ id: parallelCalls[i].id, tool: parallelCalls[i].tool, result: `Tool error: ${r.reason}` });
+      }
+    });
+    toolResults.push(...browserResults);
+
+    // Re-order to match original toolCalls order for correct tool_result mapping
+    const orderedResults = toolCalls.map((tc) =>
+      toolResults.find((tr) => tr.id === tc.id) ?? { id: tc.id, tool: tc.tool, result: "Tool execution failed" }
+    );
 
     let consecutiveSaveOnly = args.consecutiveSaveOnlySteps ?? 0;
     if (hasNonSaveFinding) {
@@ -317,17 +445,17 @@ export const step = internalAction({
       }
     }
 
-    for (const tr of toolResults) {
-      await ctx.runMutation(api.investigations.addStep, {
-        investigationId: args.investigationId,
-        stepNumber,
-        action: `Result from ${tr.tool}`,
-        tool: tr.tool,
-        result: tr.result.slice(0, 2000),
-      });
-    }
+    // Batch log all tool result steps in a single mutation
+    const stepEntries = orderedResults.map((tr) => ({
+      investigationId: args.investigationId,
+      stepNumber,
+      action: `Result from ${tr.tool}`,
+      tool: tr.tool,
+      result: tr.result.slice(0, 2000),
+    }));
+    await ctx.runMutation(api.investigations.addSteps, { steps: stepEntries });
 
-    const toolResultBlocks = toolResults.map((tr) => ({
+    const toolResultBlocks = orderedResults.map((tr) => ({
       type: "tool_result",
       tool_use_id: tr.id,
       content: tr.result.slice(0, 4000),
@@ -355,6 +483,7 @@ export const step = internalAction({
       conversationHistory: JSON.stringify(finalHistory),
       consecutiveSaveOnlySteps: consecutiveSaveOnly,
       maigretAvailable,
+      extremeMode,
     });
   },
 });
@@ -366,6 +495,7 @@ async function executeToolCall(
     investigation: { targetName: string; targetDescription?: string };
     toolCall: ToolCall;
     stepNumber: number;
+    extremeMode?: boolean;
   }
 ): Promise<string> {
   const { investigationId, investigation, toolCall, stepNumber } = params;
@@ -400,6 +530,22 @@ async function executeToolCall(
           }
         }
 
+        // Persist graph edges from connection graph
+        if (investigateResult.lead_graph?.length > 0) {
+          const edges = investigateResult.lead_graph.slice(0, 20).map((edge: { from: string; to: string; platform?: string; reason: string }) => ({
+            investigationId,
+            fromLabel: `@${edge.from}`,
+            toLabel: `@${edge.to}`,
+            fromType: "person",
+            toType: "profile",
+            edgeType: "found_via" as const,
+            platform: edge.platform || undefined,
+            reason: edge.reason,
+            confidence: 70,
+          }));
+          await ctx.runMutation(api.graphEdges.addEdges, { edges });
+        }
+
         if (investigateResult.llm_analysis) {
           await ctx.runMutation(api.investigations.addStep, {
             investigationId,
@@ -426,6 +572,7 @@ async function executeToolCall(
           task: toolCall.args.instruction as string,
           sessionId,
           investigationId,
+          extremeMode: params.extremeMode,
         });
 
         const toolResult = browserResult?.output ?? JSON.stringify(browserResult);
@@ -455,6 +602,32 @@ async function executeToolCall(
         return JSON.stringify(searchResult);
       }
 
+      case "geospy_predict": {
+        await ctx.runMutation(api.investigations.addStep, {
+          investigationId,
+          stepNumber,
+          action: `GeoSpy: Geolocating image from ${(toolCall.args.imageUrl as string).slice(0, 100)}`,
+          tool: "geospy",
+        });
+        const geoResult = await ctx.runAction(internal.tools.geoSpy.predict, {
+          imageUrl: toolCall.args.imageUrl as string,
+        });
+        // Auto-save location finding with coordinates
+        if (geoResult.city || geoResult.country) {
+          const locationParts = [geoResult.city, geoResult.state, geoResult.country].filter(Boolean);
+          await ctx.runMutation(api.investigations.addFinding, {
+            investigationId,
+            source: "geospy",
+            category: "location",
+            data: `Photo geolocated to ${locationParts.join(", ")} (${geoResult.latitude}, ${geoResult.longitude}). ${geoResult.explanation || ""}`,
+            confidence: 70,
+            latitude: typeof geoResult.latitude === "number" ? geoResult.latitude : undefined,
+            longitude: typeof geoResult.longitude === "number" ? geoResult.longitude : undefined,
+          });
+        }
+        return JSON.stringify(geoResult);
+      }
+
       case "geo_locate": {
         await ctx.runMutation(api.investigations.addStep, {
           investigationId,
@@ -462,24 +635,124 @@ async function executeToolCall(
           action: `Running Picarta AI geolocation on image`,
           tool: "geo_locate",
         });
-        const geoResult = await ctx.runAction(internal.tools.picarta.localize, {
+        const picartaResult = await ctx.runAction(internal.tools.picarta.localize, {
           imageUrl: toolCall.args.imageUrl as string,
         });
-
         // Auto-save location finding if we got coordinates
-        if (geoResult.latitude && geoResult.longitude) {
-          const locationParts = [geoResult.city, geoResult.province, geoResult.country].filter(Boolean);
-          const conf = geoResult.confidence ? Math.round(geoResult.confidence * 100) : 60;
+        if (picartaResult.latitude && picartaResult.longitude) {
+          const locationParts = [picartaResult.city, picartaResult.province, picartaResult.country].filter(Boolean);
+          const conf = picartaResult.confidence ? Math.round(picartaResult.confidence * 100) : 60;
           await ctx.runMutation(api.investigations.addFinding, {
             investigationId,
             source: "picarta",
             category: "location",
             platform: "picarta",
-            data: `Photo geo-located to ${locationParts.join(", ")} (${geoResult.latitude}, ${geoResult.longitude}). Confidence: ${conf}%${geoResult.exifCountry ? `. EXIF confirms: ${geoResult.exifCountry}` : ""}`,
+            data: `Photo geo-located to ${locationParts.join(", ")} (${picartaResult.latitude}, ${picartaResult.longitude}). Confidence: ${conf}%${picartaResult.exifCountry ? `. EXIF confirms: ${picartaResult.exifCountry}` : ""}`,
             confidence: conf,
           });
         }
-        return JSON.stringify(geoResult);
+        return JSON.stringify(picartaResult);
+      }
+
+      case "whitepages_lookup": {
+        await ctx.runMutation(api.investigations.addStep, {
+          investigationId,
+          stepNumber,
+          action: `WhitePages: Looking up ${toolCall.args.name || toolCall.args.phone || "target"}`,
+          tool: "whitepages",
+        });
+        const wpResult = await ctx.runAction(internal.tools.whitePages.findPerson, {
+          name: toolCall.args.name as string | undefined,
+          phone: toolCall.args.phone as string | undefined,
+          city: toolCall.args.city as string | undefined,
+          stateCode: toolCall.args.stateCode as string | undefined,
+        });
+        // Auto-save location findings with lat/lng from address data
+        if (wpResult.results && Array.isArray(wpResult.results)) {
+          for (const person of wpResult.results.slice(0, 3)) {
+            if (person.addresses && Array.isArray(person.addresses)) {
+              for (const addr of person.addresses.slice(0, 2)) {
+                if (addr.city || addr.state) {
+                  await ctx.runMutation(api.investigations.addFinding, {
+                    investigationId,
+                    source: "whitepages",
+                    category: "location",
+                    data: `Address: ${addr.address || ""} ${addr.city || ""}, ${addr.state || ""} ${addr.zip || ""}`.trim(),
+                    confidence: 65,
+                    latitude: typeof addr.lat === "number" ? addr.lat : undefined,
+                    longitude: typeof addr.lng === "number" ? addr.lng : undefined,
+                  });
+                }
+              }
+            }
+          }
+        }
+        return JSON.stringify(wpResult);
+      }
+
+      case "reverse_image_search": {
+        await ctx.runMutation(api.investigations.addStep, {
+          investigationId,
+          stepNumber,
+          action: `Reverse Image Search: ${(toolCall.args.imageUrl as string).slice(0, 100)}`,
+          tool: "reverse_image",
+        });
+        const risResult = await ctx.runAction(internal.tools.reverseImageSearch.search, {
+          imageUrl: toolCall.args.imageUrl as string,
+        });
+        // Auto-save top 3 visual matches as social findings
+        if (risResult.visualMatches && risResult.visualMatches.length > 0) {
+          for (const match of risResult.visualMatches.slice(0, 3)) {
+            if (match.title && match.url) {
+              await ctx.runMutation(api.investigations.addFinding, {
+                investigationId,
+                source: "reverse_image_search",
+                category: "social",
+                platform: match.source || undefined,
+                profileUrl: match.url || undefined,
+                data: `Image found on: ${match.title} (${match.source || "unknown source"})`,
+                confidence: 60,
+              });
+            }
+          }
+        }
+        // Auto-save knowledge graph as identity finding
+        if (risResult.knowledgeGraph?.title) {
+          await ctx.runMutation(api.investigations.addFinding, {
+            investigationId,
+            source: "reverse_image_search",
+            category: "identity",
+            profileUrl: risResult.knowledgeGraph.link || undefined,
+            data: `Identified via reverse image: ${risResult.knowledgeGraph.title}${risResult.knowledgeGraph.subtitle ? ` — ${risResult.knowledgeGraph.subtitle}` : ""}${risResult.knowledgeGraph.description ? `. ${risResult.knowledgeGraph.description}` : ""}`,
+            confidence: 75,
+          });
+        }
+        return JSON.stringify(risResult);
+      }
+
+      case "darkweb_search": {
+        await ctx.runMutation(api.investigations.addStep, {
+          investigationId,
+          stepNumber,
+          action: `Dark Web Search: "${(toolCall.args.term as string).slice(0, 100)}"`,
+          tool: "darkweb",
+        });
+        const dwResult = await ctx.runAction(internal.tools.intelx.search, {
+          term: toolCall.args.term as string,
+          maxResults: toolCall.args.maxResults as number | undefined,
+        });
+        // Auto-save summary if records found
+        if (dwResult.results && dwResult.results.length > 0) {
+          const buckets = [...new Set(dwResult.results.map((r: { bucket: string | null }) => r.bucket).filter(Boolean))];
+          await ctx.runMutation(api.investigations.addFinding, {
+            investigationId,
+            source: "darkweb_search",
+            category: "identity",
+            data: `Dark web/leak search for "${dwResult.term}": ${dwResult.totalResults} records found across ${buckets.length} source(s)${buckets.length > 0 ? ` (${buckets.slice(0, 5).join(", ")})` : ""}`,
+            confidence: 65,
+          });
+        }
+        return JSON.stringify(dwResult);
       }
 
       case "save_finding": {
@@ -500,6 +773,25 @@ async function executeToolCall(
           profileUrl: findingArgs.profileUrl,
           imageUrl: findingArgs.imageUrl,
           data: findingArgs.data,
+          confidence: findingArgs.confidence,
+        });
+        // Create implicit edge: target → finding entity
+        const entityLabel = findingArgs.platform
+          ? `${findingArgs.platform}: ${findingArgs.data.slice(0, 40)}`
+          : findingArgs.data.slice(0, 50);
+        const entityType = findingArgs.category === "location" ? "location"
+          : findingArgs.category === "social" ? "profile"
+          : findingArgs.category === "connection" ? "person"
+          : "profile";
+        await ctx.runMutation(api.graphEdges.addEdge, {
+          investigationId,
+          fromLabel: investigation.targetName,
+          toLabel: entityLabel,
+          fromType: "person",
+          toType: entityType,
+          edgeType: findingArgs.category === "location" ? "located_at" : "found_via",
+          platform: findingArgs.platform || undefined,
+          reason: findingArgs.source,
           confidence: findingArgs.confidence,
         });
         await ctx.runMutation(api.investigations.addStep, {
@@ -527,6 +819,11 @@ interface CompressionResult {
 async function compressHistory(
   conversationHistory: Array<Record<string, unknown>>
 ): Promise<CompressionResult> {
+  // Early return for small histories — skip serialization entirely
+  if (conversationHistory.length < 6) {
+    return { history: conversationHistory };
+  }
+
   const serialized = JSON.stringify(conversationHistory);
   const tokens = estimateTokens(serialized);
 
@@ -538,7 +835,7 @@ async function compressHistory(
     ? COMPRESSION_TOKEN_THRESHOLD * 1.3
     : COMPRESSION_TOKEN_THRESHOLD;
 
-  if (tokens <= effectiveThreshold || conversationHistory.length < 6) {
+  if (tokens <= effectiveThreshold) {
     return { history: conversationHistory };
   }
 
@@ -705,13 +1002,16 @@ async function generateReport(
     )
     .join("\n");
 
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
+  // Run report generation (Opus) and behavioral analysis (Sonnet) in parallel
+  const apiHeaders = {
+    "x-api-key": apiKey,
+    "anthropic-version": "2023-06-01",
+    "content-type": "application/json",
+  };
+
+  const reportPromise = fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
-    headers: {
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
-      "content-type": "application/json",
-    },
+    headers: apiHeaders,
     body: JSON.stringify({
       model: "claude-opus-4-20250514",
       max_tokens: 4096,
@@ -741,29 +1041,89 @@ Format as markdown. Be thorough and professional.`,
     }),
   });
 
-  if (!response.ok) {
-    const errText = await response.text();
+  const behavioralPromise = fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: apiHeaders,
+    body: JSON.stringify({
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 2048,
+      messages: [{
+        role: "user",
+        content: `You are a behavioral analyst. Analyze the following OSINT investigation findings and extract behavioral patterns.
+
+Target: ${investigation?.targetName || "Unknown"}
+${investigation?.targetDescription ? `Description: ${investigation.targetDescription}` : ""}
+
+## Findings
+${findingsContext}
+
+Respond with ONLY a valid JSON object (no markdown, no code fences) with these fields:
+{
+  "timezoneEstimate": "Best guess timezone based on activity patterns (e.g. 'UTC-5 / Eastern US')",
+  "usernamePatterns": ["List of username mutation patterns observed (e.g. 'firstname_lastname', 'firstnamelastinitial')"],
+  "predictedHandles": ["Predicted handles on platforms not yet found, based on username patterns"],
+  "interestClusters": ["Groups of interests/topics based on profile bios, follows, and activity"],
+  "platformAgeEstimation": "Estimated time period the person has been active online",
+  "behavioralNotes": ["Key behavioral observations — posting frequency, content type preferences, engagement patterns, privacy level"]
+}
+
+If you cannot determine a field, use null or an empty array. Base analysis ONLY on the provided findings.`,
+      }],
+    }),
+  });
+
+  const [reportResult, behavioralResult] = await Promise.allSettled([reportPromise, behavioralPromise]);
+
+  // Handle report result
+  if (reportResult.status === "rejected" || (reportResult.status === "fulfilled" && !reportResult.value.ok)) {
+    const errText = reportResult.status === "fulfilled" ? await reportResult.value.text() : reportResult.reason;
     console.error("Report generation API error:", errText);
     await cleanupBrowserSession(ctx, investigationId);
     await ctx.runMutation(api.investigations.updateStatus, {
       id: investigationId,
       status: "failed",
-      errorMessage: `Report generation failed (${response.status}): ${errText.slice(0, 500)}`,
+      errorMessage: `Report generation failed: ${String(errText).slice(0, 500)}`,
     });
     return;
   }
 
-  const data = await response.json();
+  const reportData = await reportResult.value.json();
 
-  if (data.usage) {
+  if (reportData.usage) {
     await ctx.runMutation(api.investigations.updateTokenUsage, {
       id: investigationId,
-      inputTokens: data.usage.input_tokens ?? 0,
-      outputTokens: data.usage.output_tokens ?? 0,
+      inputTokens: reportData.usage.input_tokens ?? 0,
+      outputTokens: reportData.usage.output_tokens ?? 0,
     });
   }
 
-  const report = data.content.find((b: { type: string }) => b.type === "text")?.text || "";
+  const report = reportData.content.find((b: { type: string }) => b.type === "text")?.text || "";
+
+  // Handle behavioral analysis result (non-critical — don't fail on error)
+  if (behavioralResult.status === "fulfilled" && behavioralResult.value.ok) {
+    try {
+      const behavioralData = await behavioralResult.value.json();
+      if (behavioralData.usage) {
+        await ctx.runMutation(api.investigations.updateTokenUsage, {
+          id: investigationId,
+          inputTokens: behavioralData.usage.input_tokens ?? 0,
+          outputTokens: behavioralData.usage.output_tokens ?? 0,
+          model: "claude-sonnet-4-20250514",
+        });
+      }
+      const behavioralText = behavioralData.content?.find((b: { type: string }) => b.type === "text")?.text || "";
+      if (behavioralText) {
+        await ctx.runMutation(api.investigations.updateBehavioralAnalysis, {
+          id: investigationId,
+          behavioralAnalysis: behavioralText,
+        });
+      }
+    } catch (e) {
+      console.warn("Behavioral analysis parsing failed (non-critical):", e);
+    }
+  } else {
+    console.warn("Behavioral analysis failed (non-critical):", behavioralResult.status === "rejected" ? behavioralResult.reason : "API error");
+  }
 
   await ctx.runMutation(api.investigations.updateReport, {
     id: investigationId,

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import BehavioralProfile from "./BehavioralProfile";
 
 interface Finding {
   _id: string;
@@ -29,6 +30,7 @@ interface DetectiveReportProps {
   caseId: string;
   completedAt?: number;
   estimatedCost?: number;
+  behavioralAnalysis?: string;
 }
 
 /* ─── Helpers ─── */
@@ -47,6 +49,10 @@ const TOOL_LABELS: Record<string, string> = {
   browser_action: "Web Recon",
   save_finding: "Intel Logged",
   web_search: "Web Search",
+  geospy: "Photo Geolocation",
+  whitepages: "Person Lookup",
+  reverse_image: "Image Search",
+  darkweb: "Dark Web Intel",
 };
 
 function formatCaseNumber(id: string, completedAt?: number): string {
@@ -421,6 +427,7 @@ export default function DetectiveReport({
   caseId,
   completedAt,
   estimatedCost,
+  behavioralAnalysis,
 }: DetectiveReportProps) {
   const [activeCategory, setActiveCategory] = useState<string>("all");
   const [showFullReport, setShowFullReport] = useState(false);
@@ -810,6 +817,11 @@ export default function DetectiveReport({
             </div>
           )}
         </motion.div>
+
+        {/* ── Behavioral Profile ── */}
+        {behavioralAnalysis && (
+          <BehavioralProfile analysisJson={behavioralAnalysis} />
+        )}
 
         {/* ── Visual Evidence Gallery ── */}
         {findings.some((f) => f.imageUrl) && (
