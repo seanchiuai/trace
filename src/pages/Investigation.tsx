@@ -14,6 +14,7 @@ import type { ViewMode } from "../components/ViewSwitcher";
 import RelationshipGraph from "../components/RelationshipGraph";
 import GeoIntelMap from "../components/GeoIntelMap";
 import ClarificationCard from "../components/ClarificationCard";
+import SteeringInput from "../components/SteeringInput";
 import { useGraphData } from "../hooks/useGraphData";
 
 const STATUS_CONFIG: Record<
@@ -80,6 +81,9 @@ export default function Investigation() {
   });
   const startInvestigation = useAction(api.orchestrator.startInvestigation);
   const stopInvestigation = useAction(api.orchestrator.stopInvestigation);
+  const directives = useQuery(api.directives.getDirectives, {
+    investigationId,
+  });
   const pendingClarification = useQuery(api.investigations.getPendingClarification, {
     investigationId,
   });
@@ -256,9 +260,13 @@ export default function Investigation() {
       {/* Layer 3: Finding toasts */}
       <FindingToasts findings={findings || []} />
 
+      {/* Layer 3.5: Steering input */}
+      <SteeringInput investigationId={investigationId} isLive={isLive} />
+
       {/* Layer 4: Command strip */}
       <CommandStrip
         steps={steps || []}
+        directives={directives || []}
         isLive={isLive}
         progress={progress}
         onStop={handleStop}
