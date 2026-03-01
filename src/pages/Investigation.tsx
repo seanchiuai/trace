@@ -49,6 +49,12 @@ const STATUS_CONFIG: Record<
     dotColor: "bg-danger",
     pulse: false,
   },
+  stopped: {
+    label: "STOPPED",
+    color: "text-warning",
+    dotColor: "bg-warning",
+    pulse: false,
+  },
 };
 
 export default function Investigation() {
@@ -66,12 +72,21 @@ export default function Investigation() {
     investigationId,
   });
   const startInvestigation = useAction(api.orchestrator.startInvestigation);
+  const stopInvestigation = useAction(api.orchestrator.stopInvestigation);
 
   const edges = useQuery(api.graphEdges.getEdges, { investigationId });
 
   const [started, setStarted] = useState(false);
   const [showCompletion, setShowCompletion] = useState(false);
   const [activeView, setActiveView] = useState<ViewMode>("browser");
+
+  const handleStop = async () => {
+    try {
+      await stopInvestigation({ investigationId });
+    } catch (e) {
+      console.error("Failed to stop investigation:", e);
+    }
+  };
 
   // Auto-start investigation
   useEffect(() => {
@@ -235,6 +250,7 @@ export default function Investigation() {
         steps={steps || []}
         isLive={isLive}
         progress={progress}
+        onStop={handleStop}
       />
 
       {/* Layer 5: Completion cinematic flash */}
