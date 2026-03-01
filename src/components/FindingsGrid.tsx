@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
@@ -107,6 +107,16 @@ export default function FindingsGrid({
     setFailedImages((prev) => new Set(prev).add(id));
   }, []);
 
+  // Close lightbox on Escape key
+  useEffect(() => {
+    if (!lightboxUrl) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setLightboxUrl(null);
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [lightboxUrl]);
+
   // Derive killed status from directives query + optimistic local state
   const killedFromDirectives = new Set(
     directives
@@ -192,7 +202,7 @@ export default function FindingsGrid({
                     {/* Profile photo thumbnail */}
                     {finding.imageUrl && !failedImages.has(finding._id) && (
                       <button
-                        onClick={() => setLightboxUrl(finding.imageUrl!)}
+                        onClick={() => setLightboxUrl(finding.imageUrl ?? null)}
                         className="shrink-0 relative group/photo cursor-pointer"
                       >
                         <img
