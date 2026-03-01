@@ -15,23 +15,42 @@ function estimateTokens(text: string): number {
   return Math.ceil(text.length / 3.5);
 }
 
-function buildSystemPrompt(maigretAvailable: boolean, extremeMode: boolean = false): string {
+function buildSystemPrompt(maigretAvailable: boolean, extremeMode: boolean = false, disabledTools: string[] = []): string {
   const toolLines: string[] = [];
   let n = 1;
-  if (maigretAvailable) {
+  const isEnabled = (name: string) => !disabledTools.includes(name);
+  if (maigretAvailable && isEnabled("maigret_search")) {
     toolLines.push(
       `${n++}. maigret_search(username) - OSINT search across 3,000+ sites. AI extracts connected handles from bios/metadata and auto-searches those leads. Returns profiles, leads, connection graph. High-value first move when you have a username.`
     );
   }
-  toolLines.push(
-    `${n++}. browser_action(instruction) - Control a real browser. Returns page text. SLOW (~60-180s) and LIMITED to ${MAX_BROWSER_ACTIONS} uses per investigation. See BROWSER RULES and LOGIN WALL AVOIDANCE below.`,
-    `${n++}. web_search(query, count?) - Fast web search (<1s). Returns titles, URLs, snippets. YOUR DEFAULT TOOL for lookups.`,
-    `${n++}. geo_locate(imageUrl) - Picarta AI geolocation. Returns coordinates, confidence, EXIF, top-3 predictions.`,
-    `${n++}. reverse_image_search(imageUrl) - Find where a photo appears online. Returns visual matches, knowledge graph, OCR text.`
-  );
-  if (extremeMode) {
+  if (isEnabled("browser_action")) {
     toolLines.push(
-      `${n++}. whitepages_lookup(name?, phone?, city?, stateCode?) - Deep person lookup. Returns addresses, age, phones, associates.`,
+      `${n++}. browser_action(instruction) - Control a real browser. Returns page text. SLOW (~60-180s) and LIMITED to ${MAX_BROWSER_ACTIONS} uses per investigation. See BROWSER RULES and LOGIN WALL AVOIDANCE below.`
+    );
+  }
+  if (isEnabled("web_search")) {
+    toolLines.push(
+      `${n++}. web_search(query, count?) - Fast web search (<1s). Returns titles, URLs, snippets. YOUR DEFAULT TOOL for lookups.`
+    );
+  }
+  if (isEnabled("geo_locate")) {
+    toolLines.push(
+      `${n++}. geo_locate(imageUrl) - Picarta AI geolocation. Returns coordinates, confidence, EXIF, top-3 predictions.`
+    );
+  }
+  if (isEnabled("reverse_image_search")) {
+    toolLines.push(
+      `${n++}. reverse_image_search(imageUrl) - Find where a photo appears online. Returns visual matches, knowledge graph, OCR text.`
+    );
+  }
+  if (extremeMode && isEnabled("whitepages_lookup")) {
+    toolLines.push(
+      `${n++}. whitepages_lookup(name?, phone?, city?, stateCode?) - Deep person lookup. Returns addresses, age, phones, associates.`
+    );
+  }
+  if (extremeMode && isEnabled("darkweb_search")) {
+    toolLines.push(
       `${n++}. darkweb_search(term, maxResults?) - Search leaked databases and paste sites for emails, usernames, phones.`
     );
   }
@@ -388,6 +407,7 @@ export const startInvestigation = action({
       infoLines.push(`No photo provided`);
 
     const extremeMode = investigation.extremeMode ?? false;
+    const disabledTools = investigation.disabledTools ?? [];
 
     let userMessage = `Investigate this person.\n\nAvailable info summary:\n${infoLines.join("\n")}`;
     if (investigation.instructions) {
@@ -404,6 +424,7 @@ export const startInvestigation = action({
       consecutiveSaveOnlySteps: 0,
       maigretAvailable,
       extremeMode,
+      disabledTools,
     });
   },
 });
@@ -433,6 +454,7 @@ export const step = internalAction({
     browserActionsUsed: v.optional(v.number()),
     maigretAvailable: v.optional(v.boolean()),
     extremeMode: v.optional(v.boolean()),
+    disabledTools: v.optional(v.array(v.string())),
   },
   handler: async (ctx, args) => {
     const investigation = await ctx.runQuery(api.investigations.get, { id: args.investigationId });
@@ -497,6 +519,7 @@ export const step = internalAction({
 
     const maigretAvailable = args.maigretAvailable ?? false;
     const extremeMode = args.extremeMode ?? false;
+    const disabledTools = args.disabledTools ?? [];
     let browserActionsUsed = args.browserActionsUsed ?? 0;
     let consecutiveErrors = args.consecutiveErrors ?? 0;
 
@@ -513,6 +536,7 @@ export const step = internalAction({
     });
 
     const tools = TOOL_DEFINITIONS.filter((t) => {
+      if (disabledTools.includes(t.name)) return false;
       if (t.name === "maigret_search" && !maigretAvailable) return false;
       if (t.name === "whitepages_lookup" && !extremeMode) return false;
       if (t.name === "darkweb_search" && !extremeMode) return false;
@@ -547,7 +571,7 @@ export const step = internalAction({
       body: JSON.stringify({
         model: "claude-sonnet-4-20250514",
         max_tokens: 4096,
-        system: buildSystemPrompt(maigretAvailable, extremeMode),
+        system: buildSystemPrompt(maigretAvailable, extremeMode, disabledTools),
         messages: messagesWithContext,
         tools,
       }),
@@ -630,6 +654,7 @@ export const step = internalAction({
         consecutiveSaveOnlySteps: args.consecutiveSaveOnlySteps ?? 0,
         maigretAvailable: args.maigretAvailable ?? false,
         extremeMode: args.extremeMode ?? false,
+        disabledTools: args.disabledTools,
       });
 
       // Log the question as a step
@@ -781,6 +806,7 @@ export const step = internalAction({
       browserActionsUsed,
       maigretAvailable,
       extremeMode,
+      disabledTools,
     });
   },
 });
@@ -1544,6 +1570,7 @@ export const resumeFromClarification = action({
       consecutiveSaveOnlySteps: clar.consecutiveSaveOnlySteps,
       maigretAvailable: clar.maigretAvailable,
       extremeMode: clar.extremeMode,
+      disabledTools: clar.disabledTools,
     });
   },
 });
