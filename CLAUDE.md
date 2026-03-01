@@ -54,7 +54,8 @@ convex/
 └── tools/
     ├── braveSearch.ts   # Brave Search API (fast web lookups)
     ├── browserUse.ts    # Browser Use Cloud API
-    └── maigret.ts       # Calls sidecar
+    ├── maigret.ts       # Calls sidecar
+    └── picarta.ts       # Picarta AI photo geolocation
 sidecar/
 ├── server.py            # FastAPI wrapper for Maigret CLI
 └── requirements.txt
@@ -69,6 +70,7 @@ Convex dashboard (Settings → Environment Variables):
 - `ANTHROPIC_API_KEY` — Claude API key for orchestrator
 - `BROWSER_USE_API_KEY` — Browser Use Cloud API key
 - `BRAVE_API_KEY` — Brave Search API key (for fast web lookups)
+- `PICARTA_API_KEY` — Picarta AI geolocation API key (free tier: 100 calls/month)
 - `MAIGRET_SIDECAR_URL` — Maigret sidecar URL (optional, defaults to `http://localhost:8000`)
 
 ## Boundaries

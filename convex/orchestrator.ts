@@ -24,6 +24,7 @@ function buildSystemPrompt(maigretAvailable: boolean): string {
   toolLines.push(
     `${n++}. browser_action(instruction) — Control a web browser. Give clear instructions like "Go to imginn.com/username and report what you see." IMPORTANT: For Instagram profiles, ALWAYS use imginn.com (e.g. imginn.com/username) instead of instagram.com — it shows public profiles without login walls. Returns screenshots and page text. Use for interactive pages that require scrolling or JS rendering. EXPENSIVE — prefer web_search for simple lookups.`,
     `${n++}. web_search(query, count?) — Fast web search. Returns titles, URLs, and snippets. Use this FIRST for simple lookups like "John Smith LinkedIn", "username site:twitter.com", company info, news articles, etc. Much faster and cheaper than browser_action.`,
+    `${n++}. geo_locate(imageUrl) — AI geolocation via Picarta: analyzes an image and predicts WHERE it was taken (city, state, country, GPS coordinates) based on visual clues. Returns coordinates, confidence score, EXIF metadata, and top-3 predictions. Use on any photo with visible backgrounds, landmarks, or architecture.`,
     `${n++}. save_finding(source, category, platform, data, confidence, imageUrl?, profileUrl?) — Save a confirmed finding. Categories: "social", "connection", "location", "activity", "identity". FREE — does not count toward your step budget. Save findings liberally as you discover them. IMPORTANT: When you find profile photos, post images, or any visual evidence, ALWAYS include the imageUrl. On imginn.com, image URLs look like "https://imginn.com/p/..." or CDN URLs from the page.`,
     `${n++}. done(report) — End the investigation and generate the final report.`
   );
@@ -42,6 +43,7 @@ function buildSystemPrompt(maigretAvailable: boolean): string {
     `  - Professional → prioritize LinkedIn, GitHub, company pages`,
     `  - Founder/entrepreneur → check Crunchbase, AngelList, press coverage`,
     `  - General → cast a wide net across major platforms`,
+    `- When you find photos with visible backgrounds (buildings, streets, landscapes), run geo_locate to predict GPS location`,
     `- Use web_search for simple lookups; reserve browser_action for pages that need interaction`,
     `- Save findings as you go (it's free — doesn't burn steps)`,
     `- You can call multiple tools at once — do so when actions are independent`,
@@ -103,6 +105,18 @@ const TOOL_DEFINITIONS = [
         count: { type: "number", description: "Number of results (default 10, max 20)" },
       },
       required: ["query"],
+    },
+  },
+  {
+    name: "geo_locate",
+    description:
+      "AI geolocation via Picarta: analyzes an image and predicts WHERE it was taken based on visual clues. Returns city, country, GPS coordinates, confidence score, top-3 predictions, and EXIF metadata.",
+    input_schema: {
+      type: "object",
+      properties: {
+        imageUrl: { type: "string", description: "URL of the image to geo-locate" },
+      },
+      required: ["imageUrl"],
     },
   },
   {
@@ -439,6 +453,33 @@ async function executeToolCall(
           count: toolCall.args.count as number | undefined,
         });
         return JSON.stringify(searchResult);
+      }
+
+      case "geo_locate": {
+        await ctx.runMutation(api.investigations.addStep, {
+          investigationId,
+          stepNumber,
+          action: `Running Picarta AI geolocation on image`,
+          tool: "geo_locate",
+        });
+        const geoResult = await ctx.runAction(internal.tools.picarta.localize, {
+          imageUrl: toolCall.args.imageUrl as string,
+        });
+
+        // Auto-save location finding if we got coordinates
+        if (geoResult.latitude && geoResult.longitude) {
+          const locationParts = [geoResult.city, geoResult.province, geoResult.country].filter(Boolean);
+          const conf = geoResult.confidence ? Math.round(geoResult.confidence * 100) : 60;
+          await ctx.runMutation(api.investigations.addFinding, {
+            investigationId,
+            source: "picarta",
+            category: "location",
+            platform: "picarta",
+            data: `Photo geo-located to ${locationParts.join(", ")} (${geoResult.latitude}, ${geoResult.longitude}). Confidence: ${conf}%${geoResult.exifCountry ? `. EXIF confirms: ${geoResult.exifCountry}` : ""}`,
+            confidence: conf,
+          });
+        }
+        return JSON.stringify(geoResult);
       }
 
       case "save_finding": {
