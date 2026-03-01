@@ -9,7 +9,7 @@ const MAX_STEPS = 20;
 const MAX_CONSECUTIVE_SAVE_ONLY = 3;
 const COMPRESSION_TOKEN_THRESHOLD = 20_000;
 const KEEP_RECENT_EXCHANGES = 3;
-const MAX_CONSECUTIVE_ERRORS = 3;
+const MAX_CONSECUTIVE_ERRORS = 6;
 const MAX_BROWSER_ACTIONS = Infinity;
 
 function estimateTokens(text: string): number {
@@ -790,14 +790,16 @@ export const step = internalAction({
     const allToolsFailed = nonSaveResults.length > 0 && nonSaveResults.every((tr) =>
       tr.result.startsWith("Tool error:") || tr.result.includes("RECOVERY:")
     );
-    if (allToolsFailed) {
+    // Don't count browser-only failures as consecutive errors — let the LLM switch tools
+    const onlyBrowserFailed = allToolsFailed && nonSaveResults.every((tr) => tr.tool === "browser_action");
+    if (allToolsFailed && !onlyBrowserFailed) {
       consecutiveErrors++;
       if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
         console.warn(`[escalation] ${consecutiveErrors} consecutive errors — forcing report generation`);
         await generateReport(ctx, args.investigationId);
         return;
       }
-    } else {
+    } else if (!allToolsFailed) {
       consecutiveErrors = 0;
     }
 
