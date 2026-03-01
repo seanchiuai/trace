@@ -9,14 +9,23 @@ import {
   TOOL_CONFIG,
 } from "./ActivityStream";
 
+interface Directive {
+  _id: string;
+  type: "kill_lead" | "general";
+  message: string;
+  acknowledged: boolean;
+  createdAt: number;
+}
+
 interface CommandStripProps {
   steps: Step[];
+  directives?: Directive[];
   isLive: boolean;
   progress: number;
   onStop?: () => void;
 }
 
-export default function CommandStrip({ steps, isLive, progress, onStop }: CommandStripProps) {
+export default function CommandStrip({ steps, directives = [], isLive, progress, onStop }: CommandStripProps) {
   const [expanded, setExpanded] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -52,6 +61,16 @@ export default function CommandStrip({ steps, isLive, progress, onStop }: Comman
   };
 
   const lastStepId = steps.length > 0 ? steps[steps.length - 1]._id : null;
+
+  // Merge steps and directives into a single timeline sorted by createdAt
+  type TimelineItem =
+    | { kind: "step"; item: Step }
+    | { kind: "directive"; item: Directive };
+
+  const timeline: TimelineItem[] = [
+    ...steps.map((s) => ({ kind: "step" as const, item: s })),
+    ...directives.map((d) => ({ kind: "directive" as const, item: d })),
+  ].sort((a, b) => a.item.createdAt - b.item.createdAt);
 
   return (
     <div className="fixed bottom-0 inset-x-0 z-40">
@@ -112,7 +131,35 @@ export default function CommandStrip({ steps, isLive, progress, onStop }: Comman
               ) : (
                 <div className="flex flex-col gap-1 pt-2">
                   <AnimatePresence mode="popLayout">
-                    {steps.map((step) => {
+                    {timeline.map((entry) => {
+                      if (entry.kind === "directive") {
+                        const d = entry.item;
+                        return (
+                          <motion.div
+                            key={`dir-${d._id}`}
+                            initial={{ opacity: 0, x: -8 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            className="flex items-center gap-2 px-2 py-1.5 rounded-md border border-amber-500/20 bg-amber-500/[0.06]"
+                          >
+                            <span className="text-[9px] font-bold text-amber-400 tracking-wider uppercase font-mono shrink-0">
+                              OPERATOR
+                            </span>
+                            <span className="text-[11px] text-amber-200/80 truncate flex-1 min-w-0">
+                              {d.message}
+                            </span>
+                            {d.acknowledged && (
+                              <svg className="w-3 h-3 text-amber-400/60 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                              </svg>
+                            )}
+                            <span className="text-[10px] text-text-muted/50 font-mono tabular-nums whitespace-nowrap shrink-0">
+                              {formatTime(d.createdAt)}
+                            </span>
+                          </motion.div>
+                        );
+                      }
+
+                      const step = entry.item;
                       const isLast = step._id === lastStepId;
                       const isActiveStep = isLast && isLive;
                       const isManuallyExpanded = expandedIds.has(step._id);
