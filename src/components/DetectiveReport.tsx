@@ -53,6 +53,7 @@ const TOOL_LABELS: Record<string, string> = {
   whitepages: "Person Lookup",
   reverse_image: "Image Search",
   darkweb: "Dark Web Intel",
+  ask_user: "User Input",
 };
 
 function formatCaseNumber(id: string, completedAt?: number): string {

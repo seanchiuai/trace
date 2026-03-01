@@ -13,6 +13,7 @@ import ViewSwitcher from "../components/ViewSwitcher";
 import type { ViewMode } from "../components/ViewSwitcher";
 import RelationshipGraph from "../components/RelationshipGraph";
 import GeoIntelMap from "../components/GeoIntelMap";
+import ClarificationCard from "../components/ClarificationCard";
 import { useGraphData } from "../hooks/useGraphData";
 
 const STATUS_CONFIG: Record<
@@ -49,6 +50,12 @@ const STATUS_CONFIG: Record<
     dotColor: "bg-danger",
     pulse: false,
   },
+  awaiting_input: {
+    label: "AWAITING INPUT",
+    color: "text-amber-400",
+    dotColor: "bg-amber-400",
+    pulse: true,
+  },
 };
 
 export default function Investigation() {
@@ -66,6 +73,9 @@ export default function Investigation() {
     investigationId,
   });
   const startInvestigation = useAction(api.orchestrator.startInvestigation);
+  const pendingClarification = useQuery(api.investigations.getPendingClarification, {
+    investigationId,
+  });
 
   const edges = useQuery(api.graphEdges.getEdges, { investigationId });
 
@@ -128,7 +138,8 @@ export default function Investigation() {
   const isLive =
     investigation.status === "investigating" ||
     investigation.status === "planning" ||
-    investigation.status === "analyzing";
+    investigation.status === "analyzing" ||
+    investigation.status === "awaiting_input";
 
   const totalTokens =
     (investigation.totalInputTokens ?? 0) +
@@ -228,7 +239,7 @@ export default function Investigation() {
       />
 
       {/* Layer 3: Finding toasts */}
-      <FindingToasts findings={findings || []} />
+      <FindingToasts findings={findings || []} investigationId={investigationId} isLive={isLive} />
 
       {/* Layer 4: Command strip */}
       <CommandStrip
@@ -237,7 +248,20 @@ export default function Investigation() {
         progress={progress}
       />
 
-      {/* Layer 5: Completion cinematic flash */}
+      {/* Layer 5: Clarification overlay */}
+      <AnimatePresence>
+        {pendingClarification && investigation.status === "awaiting_input" && (
+          <ClarificationCard
+            key={pendingClarification._id}
+            clarificationId={pendingClarification._id}
+            question={pendingClarification.question}
+            options={pendingClarification.options}
+            context={pendingClarification.context}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Layer 6: Completion cinematic flash */}
       <AnimatePresence>
         {showCompletion && (
           <CompletionFlash

@@ -36,6 +36,7 @@ function buildSystemPrompt(maigretAvailable: boolean, extremeMode: boolean = fal
   }
   toolLines.push(
     `${n++}. save_finding(source, category, platform, data, confidence, imageUrl?, profileUrl?) — Save a confirmed finding. Categories: "social", "connection", "location", "activity", "identity". FREE — does not count toward your step budget. Save findings liberally as you discover them. IMPORTANT: When you find profile photos, post images, or any visual evidence, ALWAYS include the imageUrl. On imginn.com, image URLs look like "https://imginn.com/p/..." or CDN URLs from the page.`,
+    `${n++}. ask_user(question, options, context?) — Ask the user a clarifying question with 2-4 selectable options. Use when results are ambiguous and a quick answer would save multiple steps (e.g. "Found 12 John Smiths — which city are they likely in?"). Always include "Not sure" as the last option. FREE — doesn't burn steps.`,
     `${n++}. done(report) — End the investigation and generate the final report.`
   );
 
@@ -45,6 +46,8 @@ function buildSystemPrompt(maigretAvailable: boolean, extremeMode: boolean = fal
       ? [`  - Username known → start with maigret_search to cast a wide OSINT net`]
       : []),
     `  - Only a name → use web_search to find usernames, profiles, and leads first`,
+    `  - Common name + description → search "name" + key description details (city, job, age) on web_search FIRST to find leads; run maigret in parallel if a likely username emerges`,
+    `  - If results are overwhelming or ambiguous → use ask_user to let the user disambiguate (e.g. which city, which age range, which profile photo matches)`,
     `  - Photo available → use geospy_predict to geolocate the photo; use reverse_image_search to find where it appears online`,
     `  - Social links provided → explore those profiles directly (web_search or browser_action)`,
     `  - Phone number → search it via web_search${extremeMode ? "; also use whitepages_lookup for deep identity data" : ""}`,
@@ -70,6 +73,32 @@ ${toolLines.join("\n")}
 
 Strategy — ADAPT to what you know:
 ${strategyBullets.join("\n")}
+
+Lead Validation — CRITICAL (avoid false positives):
+- Never assume a profile belongs to the target just because the name or username matches — common names appear on millions of profiles
+- Before saving a finding, require 2+ independent corroborating signals (e.g. same name + same city, cross-linked accounts, matching photo, consistent username pattern)
+- Maigret false-positive warning: common usernames match many unrelated accounts — always verify profile content before attribution
+- Check profile content (bio, photos, location, activity dates) before attributing to target
+- Ask yourself: "Do I have evidence this is the SAME person, or just the same name?"
+- A username match alone is NOT sufficient — look for bio details, location, connections, or photos that corroborate
+- When multiple profiles share a username, compare them against known info before assuming they belong to the target
+- Prioritize unique identifiers (unusual usernames, specific email patterns, linked accounts) over common-name matches
+- If a profile contradicts known info (wrong city, wrong age, wrong profession), do NOT save it as a finding
+- When in doubt, note the lead but mark confidence low and explain why attribution is uncertain
+
+Self-Assessment Checkpoints:
+- Every 3-4 tool calls, pause and verify: "Am I still investigating the right person?"
+- Ask: "Do my findings corroborate each other, or am I mixing up different people?"
+- When to abandon a lead: no corroborating info after 2 searches, or profile details contradict known info
+- When to pursue deeper: multiple signals align, cross-linked accounts, unique identifiers match
+- Explicitly state "Abandoning this lead because..." when you redirect to prevent re-exploring dead ends
+- Prioritize depth on confirmed leads over breadth on unverified ones
+
+Directive Awareness:
+- A human investigator may inject KILL LEAD directives during the investigation
+- When you see a KILL LEAD directive, immediately stop ALL activity related to that lead
+- Never re-search, reference, or save findings about killed leads
+- Trust the human operator's judgment and redirect your efforts to other leads
 
 Always explain your reasoning before choosing an action. Be thorough but efficient.`;
 }
@@ -213,6 +242,27 @@ const TOOL_DEFINITIONS = [
     },
   },
   {
+    name: "ask_user",
+    description:
+      "Ask the user a clarifying question when you're stuck or results are ambiguous. Present 2-4 clear options. Use sparingly — only when disambiguation would save multiple wasted steps. Examples: 'Multiple John Smiths found — which city?', 'Is this the right person?' FREE — does not count toward step budget.",
+    input_schema: {
+      type: "object",
+      properties: {
+        question: { type: "string", description: "The question to ask" },
+        options: {
+          type: "array",
+          items: { type: "string" },
+          description: "2-4 answer options (always include 'Not sure' as last option)",
+        },
+        context: {
+          type: "string",
+          description: "Brief context for why you're asking",
+        },
+      },
+      required: ["question", "options"],
+    },
+  },
+  {
     name: "done",
     description: "End the investigation and generate the final detective report.",
     input_schema: {
@@ -287,9 +337,57 @@ export const step = internalAction({
       return;
     }
 
-    const conversationHistory = JSON.parse(args.conversationHistory);
+    let conversationHistory = JSON.parse(args.conversationHistory);
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) throw new Error("ANTHROPIC_API_KEY not set");
+
+    // --- Directive injection ---
+    const pendingDirectives = await ctx.runQuery(api.directives.getPendingDirectives, {
+      investigationId: args.investigationId,
+    });
+
+    if (pendingDirectives.length > 0) {
+      const directiveLines = pendingDirectives.map((d) => {
+        if (d.type === "kill_lead") {
+          return `OPERATOR DIRECTIVE: KILL LEAD. Stop pursuing: ${d.message}`;
+        }
+        return `OPERATOR DIRECTIVE: ${d.message}`;
+      });
+      const directiveText = `[HUMAN OPERATOR DIRECTIVES]\n\n${directiveLines.join("\n\n")}`;
+
+      const lastMsg = conversationHistory[conversationHistory.length - 1];
+      if (lastMsg?.role === "user" && Array.isArray(lastMsg.content)) {
+        // Last message is tool_results array — append directive as text block
+        lastMsg.content.push({ type: "text", text: directiveText });
+      } else if (lastMsg?.role === "assistant") {
+        // Add new user message with directive
+        conversationHistory.push({ role: "user", content: directiveText });
+      } else {
+        // Fallback: add as new user message
+        conversationHistory.push({ role: "user", content: directiveText });
+      }
+
+      // Acknowledge directives
+      await ctx.runMutation(api.directives.acknowledgeDirectives, {
+        directiveIds: pendingDirectives.map((d) => d._id),
+      });
+
+      // Log directive step
+      await ctx.runMutation(api.investigations.addStep, {
+        investigationId: args.investigationId,
+        stepNumber: investigation.stepCount + 1,
+        action: `Human operator directive: ${directiveLines.join("; ").slice(0, 400)}`,
+        tool: "directive",
+      });
+    }
+
+    // Build killed leads list (all kill_lead directives, including already acknowledged)
+    const allDirectives = await ctx.runQuery(api.directives.getDirectives, {
+      investigationId: args.investigationId,
+    });
+    const killedLeads = allDirectives
+      .filter((d) => d.type === "kill_lead")
+      .map((d) => d.message);
 
     const maigretAvailable = args.maigretAvailable ?? false;
     const extremeMode = args.extremeMode ?? false;
@@ -370,6 +468,42 @@ export const step = internalAction({
     if (toolCalls.find((tc) => tc.tool === "done")) {
       await reasoningPromise;
       await generateReport(ctx, args.investigationId);
+      return;
+    }
+
+    // Handle ask_user — pause the loop and wait for user response
+    const askUserCall = toolCalls.find((tc) => tc.tool === "ask_user");
+    if (askUserCall) {
+      await reasoningPromise;
+      const askArgs = askUserCall.args as { question: string; options: string[]; context?: string };
+
+      // Build the frozen conversation history (include assistant's response with the ask_user call)
+      const frozenHistory = [
+        ...conversationHistory,
+        { role: "assistant", content: data.content },
+      ];
+
+      // Create clarification record (mutation sets status → "awaiting_input")
+      await ctx.runMutation(api.investigations.createClarification, {
+        investigationId: args.investigationId,
+        question: askArgs.question,
+        options: askArgs.options,
+        context: askArgs.context,
+        conversationHistory: JSON.stringify(frozenHistory),
+        consecutiveSaveOnlySteps: args.consecutiveSaveOnlySteps ?? 0,
+        maigretAvailable: args.maigretAvailable ?? false,
+        extremeMode: args.extremeMode ?? false,
+      });
+
+      // Log the question as a step
+      await ctx.runMutation(api.investigations.addStep, {
+        investigationId: args.investigationId,
+        stepNumber,
+        action: `Asking user: ${askArgs.question}`,
+        tool: "ask_user",
+      });
+
+      // DON'T schedule next step — wait for user response
       return;
     }
 
@@ -467,7 +601,7 @@ export const step = internalAction({
       { role: "user", content: toolResultBlocks },
     ];
 
-    const { history: finalHistory, compressionTokens } = await compressHistory(updatedHistory);
+    const { history: finalHistory, compressionTokens } = await compressHistory(updatedHistory, killedLeads);
 
     if (compressionTokens) {
       await ctx.runMutation(api.investigations.updateTokenUsage, {
@@ -817,7 +951,8 @@ interface CompressionResult {
 }
 
 async function compressHistory(
-  conversationHistory: Array<Record<string, unknown>>
+  conversationHistory: Array<Record<string, unknown>>,
+  killedLeads?: string[]
 ): Promise<CompressionResult> {
   // Early return for small histories — skip serialization entirely
   if (conversationHistory.length < 6) {
@@ -940,7 +1075,7 @@ ${summaryInput}`,
         history: [
           {
             role: "user",
-            content: `${originalMessage.content as string}\n\n---\n\n[INVESTIGATION PROGRESS — Steps 1-${Math.floor(adjustedCutoff / 2)} compressed]\n\n${summary}\n\n[End of progress summary. Recent steps follow.]`,
+            content: `${originalMessage.content as string}\n\n---\n\n[INVESTIGATION PROGRESS — Steps 1-${Math.floor(adjustedCutoff / 2)} compressed]\n\n${summary}${killedLeads && killedLeads.length > 0 ? `\n\n[KILLED LEADS — Do NOT pursue these]\n${killedLeads.map((l) => `- ${l}`).join("\n")}` : ""}\n\n[End of progress summary. Recent steps follow.]`,
           },
           ...adjustedRecent,
         ],
@@ -953,7 +1088,7 @@ ${summaryInput}`,
     const compressedHistory: Array<Record<string, unknown>> = [
       {
         role: "user",
-        content: `${originalMessage.content as string}\n\n---\n\n[INVESTIGATION PROGRESS — Steps 1-${Math.floor(cutoffIndex / 2)} compressed]\n\n${summary}\n\n[End of progress summary. Recent steps follow.]`,
+        content: `${originalMessage.content as string}\n\n---\n\n[INVESTIGATION PROGRESS — Steps 1-${Math.floor(cutoffIndex / 2)} compressed]\n\n${summary}${killedLeads && killedLeads.length > 0 ? `\n\n[KILLED LEADS — Do NOT pursue these]\n${killedLeads.map((l) => `- ${l}`).join("\n")}` : ""}\n\n[End of progress summary. Recent steps follow.]`,
       },
       ...recentMessages,
     ];
@@ -1231,3 +1366,51 @@ function calculateOverallConfidence(findings: { confidence: number }[]): number 
   const sum = findings.reduce((acc, f) => acc + f.confidence, 0);
   return Math.round(sum / findings.length);
 }
+
+export const resumeFromClarification = action({
+  args: { clarificationId: v.id("clarifications") },
+  handler: async (ctx, args) => {
+    const clar = await ctx.runQuery(api.investigations.getClarification, { id: args.clarificationId });
+    if (!clar || clar.status !== "answered") return;
+
+    // Restore frozen conversation + inject user response as tool_result
+    const frozenHistory = JSON.parse(clar.conversationHistory);
+
+    // Find the ask_user tool_use block in the last assistant message to get its ID
+    const lastAssistant = frozenHistory[frozenHistory.length - 1];
+    const askBlock = lastAssistant.content.find(
+      (b: { type: string; name?: string }) => b.type === "tool_use" && b.name === "ask_user"
+    );
+
+    // Build tool_result with the user's answer
+    const toolResultBlocks = lastAssistant.content
+      .filter((b: { type: string }) => b.type === "tool_use")
+      .map((b: { type: string; id: string; name: string }) => {
+        if (b.name === "ask_user") {
+          return { type: "tool_result", tool_use_id: b.id, content: `User answered: "${clar.response}"` };
+        }
+        // For any other tool calls in the same message, return a skip result
+        return { type: "tool_result", tool_use_id: b.id, content: "Skipped — paused for user clarification" };
+      });
+
+    const resumedHistory = [
+      ...frozenHistory,
+      { role: "user", content: toolResultBlocks },
+    ];
+
+    // Set status back to "investigating"
+    await ctx.runMutation(api.investigations.updateStatus, {
+      id: clar.investigationId,
+      status: "investigating",
+    });
+
+    // Resume the loop
+    await ctx.scheduler.runAfter(0, internal.orchestrator.step, {
+      investigationId: clar.investigationId,
+      conversationHistory: JSON.stringify(resumedHistory),
+      consecutiveSaveOnlySteps: clar.consecutiveSaveOnlySteps,
+      maigretAvailable: clar.maigretAvailable,
+      extremeMode: clar.extremeMode,
+    });
+  },
+});
