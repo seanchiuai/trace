@@ -24,7 +24,6 @@ cd sidecar && pip install -r requirements.txt && python server.py
 - **React Router DOM 7** — Client-side routing
 - **Anthropic API** (Claude Opus) — Orchestrator LLM (called from Convex actions)
 - **Browser Use API** — Cloud browser automation
-- **FaceCheck.id API** — Facial recognition search
 - **Maigret** — Username OSINT (Python sidecar via FastAPI)
 
 ## Architecture
@@ -36,21 +35,25 @@ src/
 │   ├── BrowserView.tsx      # Live browser iframe
 │   ├── ActivityStream.tsx   # Real-time step log
 │   ├── FindingsGrid.tsx     # Evidence cards with confidence
-│   ├── FaceScan.tsx         # Face recognition animation overlay
 │   ├── DetectiveReport.tsx  # Final report display
 │   ├── LeadTree.tsx         # Connection network
-│   └── ImageGallery.tsx     # Found images grid
+│   ├── ImageGallery.tsx     # Found images grid
+│   ├── HudHeader.tsx        # Investigation HUD header
+│   ├── CommandStrip.tsx     # Command strip controls
+│   ├── FindingToasts.tsx    # Real-time finding notifications
+│   └── CompletionFlash.tsx  # Investigation completion animation
 ├── pages/
 │   ├── Home.tsx             # Landing + form
-│   └── Investigation.tsx    # Live dashboard
+│   ├── Investigation.tsx    # Live dashboard
+│   └── Report.tsx           # Investigation report page
 convex/
 ├── schema.ts            # Tables: investigations, findings, steps
 ├── investigations.ts    # CRUD + queries
 ├── orchestrator.ts      # Opus agentic loop (think → tool → execute → next)
 ├── reports.ts           # Report assembly
 └── tools/
+    ├── braveSearch.ts   # Brave Search API (fast web lookups)
     ├── browserUse.ts    # Browser Use Cloud API
-    ├── faceCheck.ts     # FaceCheck.id
     └── maigret.ts       # Calls sidecar
 sidecar/
 ├── server.py            # FastAPI wrapper for Maigret CLI
@@ -65,7 +68,7 @@ Frontend (`.env.local`):
 Convex dashboard (Settings → Environment Variables):
 - `ANTHROPIC_API_KEY` — Claude API key for orchestrator
 - `BROWSER_USE_API_KEY` — Browser Use Cloud API key
-- `FACECHECK_API_KEY` — FaceCheck.id API key
+- `BRAVE_API_KEY` — Brave Search API key (for fast web lookups)
 - `MAIGRET_SIDECAR_URL` — Maigret sidecar URL (optional, defaults to `http://localhost:8000`)
 
 ## Boundaries

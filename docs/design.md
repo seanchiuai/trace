@@ -119,7 +119,6 @@ Consistent pattern across all components:
 
 | Name | Description | Duration | Usage |
 |------|-------------|----------|-------|
-| `scanLine` | Vertical sweep `top: 0→100%`, fading | 1.5s infinite | FaceScan scan line |
 | `bracketSnap` | Scale `1.5→0.95→1` with fade-in | 0.3s | Face detection brackets |
 | `matchReveal` | Slide from `x:100px` with fade-in | 0.3s | Match card entrance |
 | `confidenceGlow` | Box-shadow pulse `5px→25px→5px` | 2s infinite | High confidence elements |
@@ -173,7 +172,6 @@ Consistent pattern across all components:
 - Profile URL: link icon + monospace URL
 - Hover: border brightens, bg shifts to card-hover
 
-### FaceScan (Overlay)
 - Full-screen: bg-black/85, backdrop-blur-md
 - Modal: spring entrance, top glow line
 - Header: eye icon with HUD corners, phase counter (1/3, 2/3, 3/3)
@@ -214,7 +212,6 @@ Consistent pattern across all components:
 - Left: BrowserView (full height)
 - Right top: ActivityStream (flex-1, scrollable)
 - Right bottom: FindingsGrid (h-72/h-80, scrollable)
-- FaceScan: z-50 overlay with AnimatePresence
 - Report: slides up from bottom when status="complete"
 
 ## Responsive

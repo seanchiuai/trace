@@ -108,11 +108,9 @@ All five functions are `internalAction` — only callable by the orchestrator, n
 
 | Function | File | Purpose |
 |----------|------|---------|
-| `createSession` | `convex/tools/browserUse.ts` | Create a new browser session |
-| `runTask` | `convex/tools/browserUse.ts` | Create task + poll until finished (up to 4 min) |
-| `getTaskStatus` | `convex/tools/browserUse.ts` | Check status of a specific task |
+| `runTask` | `convex/tools/browserUse.ts` | Create session + run task + poll until finished (up to 5 min) |
 | `getSession` | `convex/tools/browserUse.ts` | Fetch session details (for `liveUrl`) |
-| `stopSession` | `convex/tools/browserUse.ts` | Stop a session (PATCH with `{ action: "stop" }`) |
+| `stopSession` | `convex/tools/browserUse.ts` | Stop a session (POST to /stop endpoint) |
 
 ## Session Persistence
 

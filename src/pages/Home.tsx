@@ -170,7 +170,7 @@ export default function Home() {
             transition={{ duration: 0.5, delay: 1.6 }}
             className="text-text-muted text-xs font-mono"
           >
-            Claude Opus / Browser Use / Maigret / FaceCheck.id
+            Claude Opus / Browser Use / Maigret
           </motion.p>
         </div>
 

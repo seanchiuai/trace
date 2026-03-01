@@ -117,7 +117,7 @@ export const generateUploadUrl = mutation({
 | File | Exports | Purpose |
 |------|---------|---------|
 | `convex/schema.ts` | default schema | Table definitions + indexes |
-| `convex/investigations.ts` | `create`, `get`, `list`, `updateStatus`, `updateReport`, `updateBrowserSession`, `incrementStep`, `getFindings`, `getSteps`, `addStep`, `addFinding`, `generateUploadUrl` | All investigation CRUD |
+| `convex/investigations.ts` | `create`, `get`, `list`, `updateStatus`, `updateReport`, `updateBrowserSession`, `incrementStep`, `getFindings`, `getSteps`, `addStep`, `addFinding`, `updateTokenUsage`, `generateUploadUrl` | All investigation CRUD |
 | `convex/orchestrator.ts` | `startInvestigation` (action), `step` (internalAction) | Opus agentic loop |
 | `convex/reports.ts` | `getReport` | Assembles investigation + findings + steps |
 | `convex/tools/*.ts` | Tool-specific actions/internalActions | External API integrations |
@@ -128,7 +128,7 @@ Set in Convex dashboard (Settings → Environment Variables), NOT in `.env`:
 
 - `ANTHROPIC_API_KEY` — Claude API for orchestrator
 - `BROWSER_USE_API_KEY` — Browser Use Cloud
-- `FACECHECK_API_KEY` — FaceCheck.id
+- `BRAVE_API_KEY` — Brave Search API (fast web lookups)
 - `MAIGRET_SIDECAR_URL` — Maigret sidecar URL (optional, defaults to `http://localhost:8000`)
 
 ## Gotchas
