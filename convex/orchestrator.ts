@@ -42,6 +42,24 @@ export const startInvestigation = action({
       status: "investigating",
     });
 
+    // Eagerly create a browser session so the live URL appears in the UI immediately.
+    // Non-blocking: if this fails, runTask will auto-create a session later.
+    try {
+      const session = await ctx.runAction(
+        internal.tools.browserUse.createSession,
+        {}
+      );
+      if (session?.id && session?.live_url) {
+        await ctx.runMutation(api.investigations.updateBrowserSession, {
+          id: args.investigationId,
+          browserSessionId: session.id,
+          browserLiveUrl: session.live_url,
+        });
+      }
+    } catch (e) {
+      console.warn("Eager browser session creation failed (non-blocking):", e);
+    }
+
     // Start the orchestrator loop
     await ctx.scheduler.runAfter(0, internal.orchestrator.step, {
       investigationId: args.investigationId,
@@ -201,6 +219,7 @@ export const step = internalAction({
     if (!response.ok) {
       const errText = await response.text();
       console.error("Anthropic API error:", errText);
+      await cleanupBrowserSession(ctx, args.investigationId);
       await ctx.runMutation(api.investigations.updateStatus, {
         id: args.investigationId,
         status: "failed",
@@ -306,15 +325,29 @@ export const step = internalAction({
               sessionId: investigation.browserSessionId ?? undefined,
             }
           );
-          toolResult = JSON.stringify(browserResult);
 
-          // Update browser session info if we got one
-          if (browserResult?.session_id || browserResult?.live_url) {
-            await ctx.runMutation(api.investigations.updateBrowserSession, {
-              id: args.investigationId,
-              browserSessionId: browserResult.session_id,
-              browserLiveUrl: browserResult.live_url,
-            });
+          // Use the task output text as the tool result for the LLM
+          toolResult = browserResult?.output ?? JSON.stringify(browserResult);
+
+          // If we didn't have a session before, fetch session details for liveUrl
+          if (!investigation.browserSessionId && browserResult?.session_id) {
+            try {
+              const session = await ctx.runAction(
+                internal.tools.browserUse.getSession,
+                { sessionId: browserResult.session_id }
+              );
+              await ctx.runMutation(api.investigations.updateBrowserSession, {
+                id: args.investigationId,
+                browserSessionId: browserResult.session_id,
+                browserLiveUrl: session?.live_url,
+              });
+            } catch {
+              // Best-effort: store session_id even without liveUrl
+              await ctx.runMutation(api.investigations.updateBrowserSession, {
+                id: args.investigationId,
+                browserSessionId: browserResult.session_id,
+              });
+            }
           }
           break;
         }
@@ -410,7 +443,7 @@ export const step = internalAction({
 });
 
 async function generateReport(
-  ctx: Pick<ActionCtx, "runQuery" | "runMutation">,
+  ctx: Pick<ActionCtx, "runQuery" | "runMutation" | "runAction">,
   investigationId: string,
   conversationHistory: string
 ) {
@@ -453,6 +486,7 @@ Format as markdown. Be thorough and professional.`,
   });
 
   if (!response.ok) {
+    await cleanupBrowserSession(ctx, investigationId as any);
     await ctx.runMutation(api.investigations.updateStatus, {
       id: investigationId as any,
       status: "failed",
@@ -469,6 +503,8 @@ Format as markdown. Be thorough and professional.`,
     report,
     confidence: calculateOverallConfidence(findings),
   });
+
+  await cleanupBrowserSession(ctx, investigationId as any);
 
   await ctx.runMutation(api.investigations.updateStatus, {
     id: investigationId as any,
@@ -553,6 +589,29 @@ function formatInvestigationForOpus(result: {
   }
 
   return sections.join("\n");
+}
+
+async function cleanupBrowserSession(
+  ctx: Pick<ActionCtx, "runQuery" | "runMutation" | "runAction">,
+  investigationId: any
+) {
+  try {
+    const investigation = await ctx.runQuery(api.investigations.get, {
+      id: investigationId,
+    });
+    if (investigation?.browserSessionId) {
+      await ctx.runAction(internal.tools.browserUse.stopSession, {
+        sessionId: investigation.browserSessionId,
+      });
+      await ctx.runMutation(api.investigations.updateBrowserSession, {
+        id: investigationId,
+        browserSessionId: undefined,
+        browserLiveUrl: undefined,
+      });
+    }
+  } catch (e) {
+    console.warn("Browser session cleanup failed (best-effort):", e);
+  }
 }
 
 function calculateOverallConfidence(
