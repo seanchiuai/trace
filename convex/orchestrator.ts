@@ -257,11 +257,17 @@ export const startInvestigation = action({
 
     const extremeMode = investigation.extremeMode ?? false;
 
+    let userMessage = `Investigate this person.\n\nAvailable info summary:\n${infoLines.join("\n")}`;
+    if (investigation.instructions) {
+      userMessage += `\n\nSpecial Instructions:\n${investigation.instructions}`;
+    }
+    userMessage += `\n\nBegin your investigation. Adapt your strategy to the available information — what's your first move?`;
+
     await ctx.scheduler.runAfter(0, internal.orchestrator.step, {
       investigationId: args.investigationId,
       conversationHistory: JSON.stringify([{
         role: "user",
-        content: `Investigate this person.\n\nAvailable info summary:\n${infoLines.join("\n")}\n\nBegin your investigation. Adapt your strategy to the available information — what's your first move?`,
+        content: userMessage,
       }]),
       consecutiveSaveOnlySteps: 0,
       maigretAvailable,

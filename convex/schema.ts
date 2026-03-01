@@ -21,6 +21,7 @@ export default defineSchema({
     browserLiveUrl: v.optional(v.string()),
     report: v.optional(v.string()),
     confidence: v.optional(v.number()),
+    instructions: v.optional(v.string()),
     extremeMode: v.optional(v.boolean()),
     errorMessage: v.optional(v.string()),
     stepCount: v.number(),

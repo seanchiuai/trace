@@ -49,6 +49,7 @@ export default function Home() {
     targetPhone?: string;
     targetPhoto?: string;
     knownLinks: string[];
+    instructions?: string;
   }) => {
     setLoading(true);
     try {
