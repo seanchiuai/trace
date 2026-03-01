@@ -166,6 +166,6 @@ The system prompt defines:
 | File | What |
 |------|------|
 | `convex/orchestrator.ts` | `startInvestigation`, `step`, `generateReport`, `cleanupBrowserSession`, `calculateOverallConfidence` |
-| `convex/tools/browserUse.ts` | `createSession`, `runTask`, `getTaskStatus`, `getSession`, `stopSession` |
+| `convex/tools/browserUse.ts` | `runTask`, `getSession`, `stopSession` |
 | `convex/tools/faceCheck.ts` | `searchByImage`, `extractPlatform` |
 | `convex/tools/maigret.ts` | `search`, `batchSearch`, `healthCheck` |

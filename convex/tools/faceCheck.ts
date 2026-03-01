@@ -93,7 +93,7 @@ export const searchByImage = internalAction({
 });
 
 function extractPlatform(url: string): string {
-  if (url.includes("instagram.com")) return "Instagram";
+  if (url.includes("instagram.com") || url.includes("imginn.com")) return "Instagram";
   if (url.includes("facebook.com")) return "Facebook";
   if (url.includes("twitter.com") || url.includes("x.com")) return "X/Twitter";
   if (url.includes("linkedin.com")) return "LinkedIn";

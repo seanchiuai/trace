@@ -128,7 +128,7 @@ export default function InputForm({ onSubmit, loading }: InputFormProps) {
               onChange={(e) => setLinks(e.target.value)}
               onFocus={() => setFocused("links")}
               onBlur={() => setFocused(null)}
-              placeholder={"instagram.com/johndoe123\ntwitter.com/johndoe\ngithub.com/johndoe"}
+              placeholder={"imginn.com/johndoe123\ntwitter.com/johndoe\ngithub.com/johndoe"}
               rows={3}
               className={`${inputBase} resize-none font-mono text-xs ${focused === "links" ? inputFocus : inputIdle}`}
             />
