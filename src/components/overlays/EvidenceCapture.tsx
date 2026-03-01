@@ -16,17 +16,24 @@ export default function EvidenceCapture() {
     let w = window.innerWidth;
     let h = window.innerHeight;
 
-    canvas.width = w * dpr;
-    canvas.height = h * dpr;
-    canvas.style.width = `${w}px`;
-    canvas.style.height = `${h}px`;
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const resize = () => {
+      w = window.innerWidth;
+      h = window.innerHeight;
+      canvas.width = w * dpr;
+      canvas.height = h * dpr;
+      canvas.style.width = `${w}px`;
+      canvas.style.height = `${h}px`;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    };
+    resize();
+    window.addEventListener("resize", resize);
 
     let frame = 0;
+    let done = false;
     const totalFrames = 60; // ~1 second
 
     const draw = () => {
-      if (frame > totalFrames) return;
+      if (frame > totalFrames) { done = true; return; }
       ctx.clearRect(0, 0, w, h);
       frame++;
 
@@ -109,7 +116,11 @@ export default function EvidenceCapture() {
     };
 
     animId = requestAnimationFrame(draw);
-    return () => cancelAnimationFrame(animId);
+    return () => {
+      done = true;
+      cancelAnimationFrame(animId);
+      window.removeEventListener("resize", resize);
+    };
   }, []);
 
   return (

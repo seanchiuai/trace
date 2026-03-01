@@ -1,4 +1,4 @@
-import React, { Suspense } from "react";
+import React, { Suspense, useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 
 const MatrixRain = React.lazy(() => import("./MatrixRain"));
@@ -31,7 +31,19 @@ interface Props {
 }
 
 export default function ToolAnimationOverlay({ activeTool, stepId }: Props) {
+  const [reducedMotion, setReducedMotion] = useState(false);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    setReducedMotion(mq.matches);
+    const handler = (e: MediaQueryListEvent) => setReducedMotion(e.matches);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, []);
+
   const OverlayComponent = activeTool ? TOOL_OVERLAY_MAP[activeTool] : null;
+
+  if (reducedMotion) return null;
 
   return (
     <div className="absolute inset-0 z-5 pointer-events-none">

@@ -49,6 +49,8 @@ export default function DarkwebGlitch() {
     resize();
     window.addEventListener("resize", resize);
 
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
     const glitchBlocks: GlitchBlock[] = [];
     const textFlashes: TextFlash[] = [];
     let frameCount = 0;
@@ -56,7 +58,7 @@ export default function DarkwebGlitch() {
     let strobeTimer = 0;
 
     // Initial flash on mount — announce the darkweb
-    flashIntensity = 1.5;
+    flashIntensity = reducedMotion ? 0 : 1.5;
 
     const draw = () => {
       frameCount++;
@@ -84,11 +86,11 @@ export default function DarkwebGlitch() {
         flashIntensity -= 0.06;
       }
 
-      // Trigger flashes frequently — this is supposed to be alarming
+      // Trigger flashes — skip strobes if user prefers reduced motion
       strobeTimer--;
-      if (strobeTimer <= 0) {
+      if (strobeTimer <= 0 && !reducedMotion) {
         flashIntensity = Math.random() * 0.8 + 0.6;
-        strobeTimer = Math.floor(Math.random() * 80) + 30;
+        strobeTimer = Math.floor(Math.random() * 120) + 60;
       }
 
       // ── Heavy glitch displacement blocks ──
