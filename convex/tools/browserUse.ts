@@ -80,12 +80,18 @@ export const runTask = internalAction({
     task: v.string(),
     sessionId: v.optional(v.string()),
     investigationId: v.optional(v.string()),
+    extremeMode: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const body: Record<string, unknown> = {
       task: args.task,
       keepAlive: true,
     };
+
+    // Use premium model in extreme mode for +12% accuracy
+    if (args.extremeMode) {
+      body.model = "bu-2-0";
+    }
 
     // --- Session reuse: wait for idle or drop ---
     if (args.sessionId) {

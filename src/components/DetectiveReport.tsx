@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import BehavioralProfile from "./BehavioralProfile";
 
 interface Finding {
   _id: string;
@@ -28,6 +29,7 @@ interface DetectiveReportProps {
   caseId: string;
   completedAt?: number;
   estimatedCost?: number;
+  behavioralAnalysis?: string;
 }
 
 /* ─── Helpers ─── */
@@ -306,6 +308,7 @@ export default function DetectiveReport({
   caseId,
   completedAt,
   estimatedCost,
+  behavioralAnalysis,
 }: DetectiveReportProps) {
   const [activeCategory, setActiveCategory] = useState<string>("all");
   const [showFullReport, setShowFullReport] = useState(false);
@@ -624,6 +627,11 @@ export default function DetectiveReport({
             </div>
           )}
         </motion.div>
+
+        {/* ── Behavioral Profile ── */}
+        {behavioralAnalysis && (
+          <BehavioralProfile analysisJson={behavioralAnalysis} />
+        )}
 
         {/* ── Operation Timeline ── */}
         {steps && steps.length > 0 && (

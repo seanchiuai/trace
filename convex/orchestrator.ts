@@ -294,7 +294,7 @@ export const step = internalAction({
       },
       body: JSON.stringify({
         model: "claude-opus-4-20250514",
-        max_tokens: 2048,
+        max_tokens: 4096,
         system: buildSystemPrompt(maigretAvailable, extremeMode),
         messages: conversationHistory,
         tools,
@@ -336,43 +336,87 @@ export const step = internalAction({
 
     const stepNumber = investigation.stepCount + 1;
 
-    if (reasoning) {
-      await ctx.runMutation(api.investigations.addStep, {
-        investigationId: args.investigationId,
-        stepNumber,
-        action: reasoning.slice(0, 500),
-        tool: "reasoning",
-      });
-    }
+    // Log reasoning step (non-blocking — fire and continue)
+    const reasoningPromise = reasoning
+      ? ctx.runMutation(api.investigations.addStep, {
+          investigationId: args.investigationId,
+          stepNumber,
+          action: reasoning.slice(0, 500),
+          tool: "reasoning",
+        })
+      : Promise.resolve();
 
     if (toolCalls.length === 0) {
+      await reasoningPromise;
       await generateReport(ctx, args.investigationId);
       return;
     }
 
     if (toolCalls.find((tc) => tc.tool === "done")) {
+      await reasoningPromise;
       await generateReport(ctx, args.investigationId);
       return;
     }
 
+    await reasoningPromise;
+
     const toolResults: { id: string; tool: string; result: string }[] = [];
     let hasNonSaveFinding = false;
-    let currentStepNumber = stepNumber;
 
+    // Pre-compute step number — no need to re-query per tool
+    let currentStepNumber = stepNumber;
     for (const tc of toolCalls) {
       if (tc.tool !== "save_finding") {
         hasNonSaveFinding = true;
-        currentStepNumber = (await ctx.runQuery(api.investigations.get, { id: args.investigationId }))?.stepCount ?? currentStepNumber;
-        currentStepNumber += 1;
       }
+    }
+    if (hasNonSaveFinding) {
+      currentStepNumber = stepNumber + 1;
+    }
+
+    // Separate browser_action calls (must be sequential — shared session) from parallelizable tools
+    const browserCalls = toolCalls.filter((tc) => tc.tool === "browser_action");
+    const parallelCalls = toolCalls.filter((tc) => tc.tool !== "browser_action");
+
+    // Execute parallelizable tools concurrently
+    const parallelPromises = parallelCalls.map(async (tc) => {
       const result = await executeToolCall(ctx, {
         investigationId: args.investigationId,
         investigation,
         toolCall: tc,
         stepNumber: currentStepNumber,
+        extremeMode,
       });
-      toolResults.push({ id: tc.id, tool: tc.tool, result });
+      return { id: tc.id, tool: tc.tool, result };
+    });
+
+    // Execute browser_action calls sequentially
+    const browserResults: { id: string; tool: string; result: string }[] = [];
+    for (const tc of browserCalls) {
+      const result = await executeToolCall(ctx, {
+        investigationId: args.investigationId,
+        investigation,
+        toolCall: tc,
+        stepNumber: currentStepNumber,
+        extremeMode,
+      });
+      browserResults.push({ id: tc.id, tool: tc.tool, result });
     }
+
+    const parallelResults = await Promise.allSettled(parallelPromises);
+    for (const r of parallelResults) {
+      if (r.status === "fulfilled") {
+        toolResults.push(r.value);
+      } else {
+        toolResults.push({ id: "error", tool: "unknown", result: `Tool error: ${r.reason}` });
+      }
+    }
+    toolResults.push(...browserResults);
+
+    // Re-order to match original toolCalls order for correct tool_result mapping
+    const orderedResults = toolCalls.map((tc) =>
+      toolResults.find((tr) => tr.id === tc.id) ?? { id: tc.id, tool: tc.tool, result: "Tool execution failed" }
+    );
 
     let consecutiveSaveOnly = args.consecutiveSaveOnlySteps ?? 0;
     if (hasNonSaveFinding) {
@@ -386,17 +430,17 @@ export const step = internalAction({
       }
     }
 
-    for (const tr of toolResults) {
-      await ctx.runMutation(api.investigations.addStep, {
-        investigationId: args.investigationId,
-        stepNumber,
-        action: `Result from ${tr.tool}`,
-        tool: tr.tool,
-        result: tr.result.slice(0, 2000),
-      });
-    }
+    // Batch log all tool result steps in a single mutation
+    const stepEntries = orderedResults.map((tr) => ({
+      investigationId: args.investigationId,
+      stepNumber,
+      action: `Result from ${tr.tool}`,
+      tool: tr.tool,
+      result: tr.result.slice(0, 2000),
+    }));
+    await ctx.runMutation(api.investigations.addSteps, { steps: stepEntries });
 
-    const toolResultBlocks = toolResults.map((tr) => ({
+    const toolResultBlocks = orderedResults.map((tr) => ({
       type: "tool_result",
       tool_use_id: tr.id,
       content: tr.result.slice(0, 4000),
@@ -436,6 +480,7 @@ async function executeToolCall(
     investigation: { targetName: string; targetDescription?: string };
     toolCall: ToolCall;
     stepNumber: number;
+    extremeMode?: boolean;
   }
 ): Promise<string> {
   const { investigationId, investigation, toolCall, stepNumber } = params;
@@ -470,6 +515,22 @@ async function executeToolCall(
           }
         }
 
+        // Persist graph edges from connection graph
+        if (investigateResult.lead_graph?.length > 0) {
+          const edges = investigateResult.lead_graph.slice(0, 20).map((edge: { from: string; to: string; platform?: string; reason: string }) => ({
+            investigationId,
+            fromLabel: `@${edge.from}`,
+            toLabel: `@${edge.to}`,
+            fromType: "person",
+            toType: "profile",
+            edgeType: "found_via" as const,
+            platform: edge.platform || undefined,
+            reason: edge.reason,
+            confidence: 70,
+          }));
+          await ctx.runMutation(api.graphEdges.addEdges, { edges });
+        }
+
         if (investigateResult.llm_analysis) {
           await ctx.runMutation(api.investigations.addStep, {
             investigationId,
@@ -496,6 +557,7 @@ async function executeToolCall(
           task: toolCall.args.instruction as string,
           sessionId,
           investigationId,
+          extremeMode: params.extremeMode,
         });
 
         const toolResult = browserResult?.output ?? JSON.stringify(browserResult);
@@ -535,7 +597,7 @@ async function executeToolCall(
         const geoResult = await ctx.runAction(internal.tools.geoSpy.predict, {
           imageUrl: toolCall.args.imageUrl as string,
         });
-        // Auto-save location finding
+        // Auto-save location finding with coordinates
         if (geoResult.city || geoResult.country) {
           const locationParts = [geoResult.city, geoResult.state, geoResult.country].filter(Boolean);
           await ctx.runMutation(api.investigations.addFinding, {
@@ -544,6 +606,8 @@ async function executeToolCall(
             category: "location",
             data: `Photo geolocated to ${locationParts.join(", ")} (${geoResult.latitude}, ${geoResult.longitude}). ${geoResult.explanation || ""}`,
             confidence: 70,
+            latitude: typeof geoResult.latitude === "number" ? geoResult.latitude : undefined,
+            longitude: typeof geoResult.longitude === "number" ? geoResult.longitude : undefined,
           });
         }
         return JSON.stringify(geoResult);
@@ -562,6 +626,26 @@ async function executeToolCall(
           city: toolCall.args.city as string | undefined,
           stateCode: toolCall.args.stateCode as string | undefined,
         });
+        // Auto-save location findings with lat/lng from address data
+        if (wpResult.results && Array.isArray(wpResult.results)) {
+          for (const person of wpResult.results.slice(0, 3)) {
+            if (person.addresses && Array.isArray(person.addresses)) {
+              for (const addr of person.addresses.slice(0, 2)) {
+                if (addr.city || addr.state) {
+                  await ctx.runMutation(api.investigations.addFinding, {
+                    investigationId,
+                    source: "whitepages",
+                    category: "location",
+                    data: `Address: ${addr.address || ""} ${addr.city || ""}, ${addr.state || ""} ${addr.zip || ""}`.trim(),
+                    confidence: 65,
+                    latitude: typeof addr.lat === "number" ? addr.lat : undefined,
+                    longitude: typeof addr.lng === "number" ? addr.lng : undefined,
+                  });
+                }
+              }
+            }
+          }
+        }
         return JSON.stringify(wpResult);
       }
 
@@ -648,6 +732,25 @@ async function executeToolCall(
           data: findingArgs.data,
           confidence: findingArgs.confidence,
         });
+        // Create implicit edge: target → finding entity
+        const entityLabel = findingArgs.platform
+          ? `${findingArgs.platform}: ${findingArgs.data.slice(0, 40)}`
+          : findingArgs.data.slice(0, 50);
+        const entityType = findingArgs.category === "location" ? "location"
+          : findingArgs.category === "social" ? "profile"
+          : findingArgs.category === "connection" ? "person"
+          : "profile";
+        await ctx.runMutation(api.graphEdges.addEdge, {
+          investigationId,
+          fromLabel: investigation.targetName,
+          toLabel: entityLabel,
+          fromType: "person",
+          toType: entityType,
+          edgeType: findingArgs.category === "location" ? "located_at" : "found_via",
+          platform: findingArgs.platform || undefined,
+          reason: findingArgs.source,
+          confidence: findingArgs.confidence,
+        });
         await ctx.runMutation(api.investigations.addStep, {
           investigationId,
           stepNumber,
@@ -673,6 +776,11 @@ interface CompressionResult {
 async function compressHistory(
   conversationHistory: Array<Record<string, unknown>>
 ): Promise<CompressionResult> {
+  // Early return for small histories — skip serialization entirely
+  if (conversationHistory.length < 6) {
+    return { history: conversationHistory };
+  }
+
   const serialized = JSON.stringify(conversationHistory);
   const tokens = estimateTokens(serialized);
 
@@ -684,7 +792,7 @@ async function compressHistory(
     ? COMPRESSION_TOKEN_THRESHOLD * 1.3
     : COMPRESSION_TOKEN_THRESHOLD;
 
-  if (tokens <= effectiveThreshold || conversationHistory.length < 6) {
+  if (tokens <= effectiveThreshold) {
     return { history: conversationHistory };
   }
 
@@ -851,13 +959,16 @@ async function generateReport(
     )
     .join("\n");
 
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
+  // Run report generation (Opus) and behavioral analysis (Sonnet) in parallel
+  const apiHeaders = {
+    "x-api-key": apiKey,
+    "anthropic-version": "2023-06-01",
+    "content-type": "application/json",
+  };
+
+  const reportPromise = fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
-    headers: {
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
-      "content-type": "application/json",
-    },
+    headers: apiHeaders,
     body: JSON.stringify({
       model: "claude-opus-4-20250514",
       max_tokens: 4096,
@@ -887,29 +998,89 @@ Format as markdown. Be thorough and professional.`,
     }),
   });
 
-  if (!response.ok) {
-    const errText = await response.text();
+  const behavioralPromise = fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: apiHeaders,
+    body: JSON.stringify({
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 2048,
+      messages: [{
+        role: "user",
+        content: `You are a behavioral analyst. Analyze the following OSINT investigation findings and extract behavioral patterns.
+
+Target: ${investigation?.targetName || "Unknown"}
+${investigation?.targetDescription ? `Description: ${investigation.targetDescription}` : ""}
+
+## Findings
+${findingsContext}
+
+Respond with ONLY a valid JSON object (no markdown, no code fences) with these fields:
+{
+  "timezoneEstimate": "Best guess timezone based on activity patterns (e.g. 'UTC-5 / Eastern US')",
+  "usernamePatterns": ["List of username mutation patterns observed (e.g. 'firstname_lastname', 'firstnamelastinitial')"],
+  "predictedHandles": ["Predicted handles on platforms not yet found, based on username patterns"],
+  "interestClusters": ["Groups of interests/topics based on profile bios, follows, and activity"],
+  "platformAgeEstimation": "Estimated time period the person has been active online",
+  "behavioralNotes": ["Key behavioral observations — posting frequency, content type preferences, engagement patterns, privacy level"]
+}
+
+If you cannot determine a field, use null or an empty array. Base analysis ONLY on the provided findings.`,
+      }],
+    }),
+  });
+
+  const [reportResult, behavioralResult] = await Promise.allSettled([reportPromise, behavioralPromise]);
+
+  // Handle report result
+  if (reportResult.status === "rejected" || (reportResult.status === "fulfilled" && !reportResult.value.ok)) {
+    const errText = reportResult.status === "fulfilled" ? await reportResult.value.text() : reportResult.reason;
     console.error("Report generation API error:", errText);
     await cleanupBrowserSession(ctx, investigationId);
     await ctx.runMutation(api.investigations.updateStatus, {
       id: investigationId,
       status: "failed",
-      errorMessage: `Report generation failed (${response.status}): ${errText.slice(0, 500)}`,
+      errorMessage: `Report generation failed: ${String(errText).slice(0, 500)}`,
     });
     return;
   }
 
-  const data = await response.json();
+  const reportData = await reportResult.value.json();
 
-  if (data.usage) {
+  if (reportData.usage) {
     await ctx.runMutation(api.investigations.updateTokenUsage, {
       id: investigationId,
-      inputTokens: data.usage.input_tokens ?? 0,
-      outputTokens: data.usage.output_tokens ?? 0,
+      inputTokens: reportData.usage.input_tokens ?? 0,
+      outputTokens: reportData.usage.output_tokens ?? 0,
     });
   }
 
-  const report = data.content.find((b: { type: string }) => b.type === "text")?.text || "";
+  const report = reportData.content.find((b: { type: string }) => b.type === "text")?.text || "";
+
+  // Handle behavioral analysis result (non-critical — don't fail on error)
+  if (behavioralResult.status === "fulfilled" && behavioralResult.value.ok) {
+    try {
+      const behavioralData = await behavioralResult.value.json();
+      if (behavioralData.usage) {
+        await ctx.runMutation(api.investigations.updateTokenUsage, {
+          id: investigationId,
+          inputTokens: behavioralData.usage.input_tokens ?? 0,
+          outputTokens: behavioralData.usage.output_tokens ?? 0,
+          model: "claude-sonnet-4-20250514",
+        });
+      }
+      const behavioralText = behavioralData.content?.find((b: { type: string }) => b.type === "text")?.text || "";
+      if (behavioralText) {
+        await ctx.runMutation(api.investigations.updateBehavioralAnalysis, {
+          id: investigationId,
+          behavioralAnalysis: behavioralText,
+        });
+      }
+    } catch (e) {
+      console.warn("Behavioral analysis parsing failed (non-critical):", e);
+    }
+  } else {
+    console.warn("Behavioral analysis failed (non-critical):", behavioralResult.status === "rejected" ? behavioralResult.reason : "API error");
+  }
 
   await ctx.runMutation(api.investigations.updateReport, {
     id: investigationId,
