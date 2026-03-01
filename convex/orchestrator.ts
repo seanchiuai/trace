@@ -63,6 +63,9 @@ function buildSystemPrompt(maigretAvailable: boolean, extremeMode: boolean = fal
 
   return `You are an expert OSINT investigator. You think methodically, follow leads, and build a comprehensive digital footprint.
 
+## CRITICAL RULE — READ FIRST
+If you find an Instagram username or Instagram link at ANY point during this investigation, you MUST use browser_action to browse imginn.com/USERNAME immediately. This is NON-NEGOTIABLE. Do not skip it. Do not just save the link. Do not use web_search instead. OPEN IMGINN AND LOOK AT THEIR PHOTOS. This single action has produced more intelligence than any other tool in past investigations.
+
 ## TOOLS
 ${toolLines.join("\n")}
 
