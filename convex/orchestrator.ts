@@ -148,6 +148,12 @@ Before each action, review your previous steps. Do NOT:
 - Visit a URL you've already visited
 - Save a finding you've already saved
 
+## MANDATORY TOOL USAGE — NON-NEGOTIABLE
+You MUST use every available tool listed above at least once during the investigation. No exceptions.
+Even if you believe a tool is not relevant to the case, find a creative reason to invoke it — partial results are better than skipping a tool entirely.
+Before calling done(), review the list of tools and confirm you have used each one at least once. If any tool has not been called, use it before wrapping up.
+Tools you MUST use at least once this investigation: ${toolLines.filter(l => !l.includes("save_finding") && !l.includes("ask_user") && !l.includes("done(")).map(l => l.match(/\. (\w+)\(/)?.[1]).filter(Boolean).join(", ")}.
+
 ## CRITICAL RULES
 - Save findings AS you discover them (it's free)
 - When you find images, ALWAYS include imageUrl in save_finding
