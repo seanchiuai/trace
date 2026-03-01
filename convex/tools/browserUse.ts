@@ -106,7 +106,7 @@ export const stopSession = internalAction({
     const res = await fetch(`${BROWSER_USE_API}/sessions/${args.sessionId}`, {
       method: "PATCH",
       headers: getHeaders(),
-      body: JSON.stringify({ status: "stopped" }),
+      body: JSON.stringify({ action: "stop" }),
     });
 
     // 404 is fine — session may already be gone

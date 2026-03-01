@@ -49,11 +49,11 @@ export const startInvestigation = action({
         internal.tools.browserUse.createSession,
         {}
       );
-      if (session?.id && session?.live_url) {
+      if (session?.id && session?.liveUrl) {
         await ctx.runMutation(api.investigations.updateBrowserSession, {
           id: args.investigationId,
           browserSessionId: session.id,
-          browserLiveUrl: session.live_url,
+          browserLiveUrl: session.liveUrl,
         });
       }
     } catch (e) {
@@ -330,22 +330,22 @@ export const step = internalAction({
           toolResult = browserResult?.output ?? JSON.stringify(browserResult);
 
           // If we didn't have a session before, fetch session details for liveUrl
-          if (!investigation.browserSessionId && browserResult?.session_id) {
+          if (!investigation.browserSessionId && browserResult?.sessionId) {
             try {
               const session = await ctx.runAction(
                 internal.tools.browserUse.getSession,
-                { sessionId: browserResult.session_id }
+                { sessionId: browserResult.sessionId }
               );
               await ctx.runMutation(api.investigations.updateBrowserSession, {
                 id: args.investigationId,
-                browserSessionId: browserResult.session_id,
-                browserLiveUrl: session?.live_url,
+                browserSessionId: browserResult.sessionId,
+                browserLiveUrl: session?.liveUrl,
               });
             } catch {
               // Best-effort: store session_id even without liveUrl
               await ctx.runMutation(api.investigations.updateBrowserSession, {
                 id: args.investigationId,
-                browserSessionId: browserResult.session_id,
+                browserSessionId: browserResult.sessionId,
               });
             }
           }
