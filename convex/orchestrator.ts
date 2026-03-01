@@ -953,6 +953,8 @@ async function executeToolCall(
             platform: "picarta",
             data: `Photo geo-located to ${locationParts.join(", ")} (${picartaResult.latitude}, ${picartaResult.longitude}). Confidence: ${conf}%${picartaResult.exifCountry ? `. EXIF confirms: ${picartaResult.exifCountry}` : ""}`,
             confidence: conf,
+            latitude: picartaResult.latitude,
+            longitude: picartaResult.longitude,
           });
         }
         return JSON.stringify(picartaResult);
