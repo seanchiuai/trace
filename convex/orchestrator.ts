@@ -588,7 +588,7 @@ export const step = internalAction({
         "content-type": "application/json",
       },
       body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
+        model: "claude-opus-4-20250514",
         max_tokens: 4096,
         system: buildSystemPrompt(maigretAvailable, extremeMode, disabledTools),
         messages: messagesWithContext,
@@ -813,7 +813,7 @@ export const step = internalAction({
         id: args.investigationId,
         inputTokens: compressionTokens.input,
         outputTokens: compressionTokens.output,
-        model: "claude-sonnet-4-20250514",
+        model: "claude-opus-4-20250514",
       });
     }
 
@@ -1214,7 +1214,7 @@ async function compressHistory(
         "content-type": "application/json",
       },
       body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
+        model: "claude-opus-4-20250514",
         max_tokens: 1024,
         messages: [{
           role: "user",
@@ -1370,7 +1370,7 @@ Format as markdown. Be thorough and professional.`,
     method: "POST",
     headers: apiHeaders,
     body: JSON.stringify({
-      model: "claude-sonnet-4-20250514",
+      model: "claude-opus-4-20250514",
       max_tokens: 2048,
       messages: [{
         role: "user",
@@ -1433,7 +1433,7 @@ If you cannot determine a field, use null or an empty array. Base analysis ONLY 
           id: investigationId,
           inputTokens: behavioralData.usage.input_tokens ?? 0,
           outputTokens: behavioralData.usage.output_tokens ?? 0,
-          model: "claude-sonnet-4-20250514",
+          model: "claude-opus-4-20250514",
         });
       }
       const behavioralText = behavioralData.content?.find((b: { type: string }) => b.type === "text")?.text || "";
