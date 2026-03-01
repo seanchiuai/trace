@@ -50,6 +50,8 @@ export default function Home() {
     targetPhoto?: string;
     knownLinks: string[];
     instructions?: string;
+    extremeMode: boolean;
+    disabledTools: string[];
   }) => {
     setLoading(true);
     try {
