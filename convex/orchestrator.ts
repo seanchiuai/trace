@@ -4,30 +4,157 @@ import { internal, api } from "./_generated/api";
 import type { ActionCtx } from "./_generated/server";
 
 const MAX_STEPS = 20;
+const MAX_CONSECUTIVE_SAVE_ONLY = 3;
 
+// Issue 3: Adaptive system prompt — no fixed strategy, considers target type & available info
 const SYSTEM_PROMPT = `You are an expert missing persons investigator. You think methodically, follow leads, and build a comprehensive picture of a person's digital footprint.
 
 You have access to these tools:
 1. maigret_search(username) — Intelligent OSINT: searches 3,000+ sites for the username, then an AI reads all profile bios/metadata to extract REAL connected handles (e.g. "X: @handle" in a Telegram bio, GitHub profile linking to Twitter, etc.), and automatically searches those leads too. Returns primary profiles, AI-extracted leads with reasoning, lead search results, and a connection graph. One call gives you a deep web of connected accounts — not just the primary username.
-2. browser_action(instruction) — Control a web browser. Give clear instructions like "Go to instagram.com/username and report what you see." Returns screenshots and page text.
+2. browser_action(instruction) — Control a web browser. Give clear instructions like "Go to instagram.com/username and report what you see." Returns screenshots and page text. Use for interactive pages that require login walls, scrolling, or JS rendering. EXPENSIVE — prefer web_search for simple lookups.
 3. face_check(imageUrl) — Run facial recognition on an image. Returns matching profiles with confidence scores. Use on group photos or profile pictures.
-4. save_finding(source, category, platform, data, confidence) — Save a confirmed finding. Categories: "social", "connection", "location", "activity", "identity".
-5. done(report) — End the investigation and generate the final report.
+4. web_search(query, count?) — Fast web search. Returns titles, URLs, and snippets. Use this FIRST for simple lookups like "John Smith LinkedIn", "username site:twitter.com", company info, news articles, etc. Much faster and cheaper than browser_action.
+5. save_finding(source, category, platform, data, confidence) — Save a confirmed finding. Categories: "social", "connection", "location", "activity", "identity". FREE — does not count toward your step budget. Save findings liberally as you discover them.
+6. done(report) — End the investigation and generate the final report.
 
-Strategy:
-- Start with Maigret to cast a wide net for the username
-- Use Browser Use to explore confirmed social profiles
-- Use FaceCheck on photos to find connected people
-- Follow leads autonomously — check friends, tagged accounts, recent activity
-- Save findings as you go
-- After gathering enough evidence (or hitting 20 steps), generate a comprehensive report
+Strategy — ADAPT to what you know:
+- Look at the available info summary to decide your first move:
+  - Username known → start with maigret_search to cast a wide OSINT net
+  - Only a name → use web_search to find usernames, profiles, and leads first
+  - Photo available → consider face_check early to find visual matches
+  - Social links provided → explore those profiles directly (web_search or browser_action)
+  - Phone number → search it via web_search
+- Consider the target type and pick platforms accordingly:
+  - Younger person → prioritize TikTok, Instagram, Snapchat, Discord
+  - Professional → prioritize LinkedIn, GitHub, company pages
+  - Founder/entrepreneur → check Crunchbase, AngelList, press coverage
+  - General → cast a wide net across major platforms
+- Use web_search for simple lookups; reserve browser_action for pages that need interaction
+- Save findings as you go (it's free — doesn't burn steps)
+- You can call multiple tools at once — do so when actions are independent
+- After gathering enough evidence (or nearing 20 steps), call done()
 
 Always explain your reasoning before choosing an action. Be thorough but efficient.`;
 
+// Issue 8: ToolCall now carries the tool_use_id for proper multi-tool responses
 interface ToolCall {
+  id: string;
   tool: string;
   args: Record<string, unknown>;
 }
+
+const TOOL_DEFINITIONS = [
+  {
+    name: "maigret_search",
+    description:
+      "Intelligent OSINT search: searches a username across 3,000+ sites, then uses AI to extract connected handles/leads from profile bios and metadata (e.g. 'X: @handle' in a Telegram bio), and automatically searches those leads too. Returns primary profiles, extracted leads with reasoning, lead profiles, and a connection graph.",
+    input_schema: {
+      type: "object",
+      properties: {
+        username: {
+          type: "string",
+          description: "The username to search for",
+        },
+      },
+      required: ["username"],
+    },
+  },
+  {
+    name: "browser_action",
+    description:
+      "Control a web browser. Give natural language instructions. Returns screenshot and page text. Use for interactive pages; prefer web_search for simple lookups.",
+    input_schema: {
+      type: "object",
+      properties: {
+        instruction: {
+          type: "string",
+          description:
+            'What to do in the browser, e.g. "Go to instagram.com/johndoe and describe what you see"',
+        },
+      },
+      required: ["instruction"],
+    },
+  },
+  {
+    name: "face_check",
+    description:
+      "Run facial recognition on an image URL. Returns matching profiles with confidence scores.",
+    input_schema: {
+      type: "object",
+      properties: {
+        imageUrl: {
+          type: "string",
+          description: "URL of the image to search faces in",
+        },
+      },
+      required: ["imageUrl"],
+    },
+  },
+  {
+    name: "web_search",
+    description:
+      "Fast web search via Brave Search API. Returns titles, URLs, and snippets. Use for quick lookups instead of browser_action.",
+    input_schema: {
+      type: "object",
+      properties: {
+        query: {
+          type: "string",
+          description: "The search query",
+        },
+        count: {
+          type: "number",
+          description: "Number of results (default 10, max 20)",
+        },
+      },
+      required: ["query"],
+    },
+  },
+  {
+    name: "save_finding",
+    description:
+      "Save a confirmed finding from the investigation. FREE — does not count toward your step budget.",
+    input_schema: {
+      type: "object",
+      properties: {
+        source: {
+          type: "string",
+          description:
+            'Where this finding came from: "instagram", "facecheck", "maigret", "browser", "web_search", etc.',
+        },
+        category: {
+          type: "string",
+          enum: ["social", "connection", "location", "activity", "identity"],
+        },
+        platform: { type: "string", description: "Platform name" },
+        profileUrl: { type: "string", description: "URL if applicable" },
+        data: {
+          type: "string",
+          description: "Description of the finding",
+        },
+        confidence: {
+          type: "number",
+          description: "Confidence 0-100",
+        },
+      },
+      required: ["source", "category", "data", "confidence"],
+    },
+  },
+  {
+    name: "done",
+    description:
+      "End the investigation and generate the final detective report.",
+    input_schema: {
+      type: "object",
+      properties: {
+        summary: {
+          type: "string",
+          description: "Brief summary of all findings",
+        },
+      },
+      required: ["summary"],
+    },
+  },
+];
 
 export const startInvestigation = action({
   args: { investigationId: v.id("investigations") },
@@ -60,22 +187,40 @@ export const startInvestigation = action({
       console.warn("Eager browser session creation failed (non-blocking):", e);
     }
 
+    // Issue 3: Build an "available info summary" so the agent adapts its first move
+    const infoLines: string[] = [];
+    infoLines.push(`Name: ${investigation.targetName}`);
+    if (investigation.targetDescription)
+      infoLines.push(`Description: ${investigation.targetDescription}`);
+    if (investigation.targetPhone)
+      infoLines.push(`Phone: ${investigation.targetPhone}`);
+    if (investigation.knownLinks.length > 0)
+      infoLines.push(`Known links: ${investigation.knownLinks.join(", ")}`);
+    if (investigation.targetPhoto)
+      infoLines.push(`Photo available: Yes`);
+    else
+      infoLines.push(`No photo provided`);
+
+    // Extract any usernames from known links for the summary
+    const usernames = extractUsernamesFromLinks(investigation.knownLinks);
+    if (usernames.length > 0)
+      infoLines.push(`Extracted usernames from links: ${usernames.join(", ")}`);
+
     // Start the orchestrator loop
     await ctx.scheduler.runAfter(0, internal.orchestrator.step, {
       investigationId: args.investigationId,
       conversationHistory: JSON.stringify([
         {
           role: "user",
-          content: `Investigate this person:
-Name: ${investigation.targetName}
-${investigation.targetDescription ? `Description: ${investigation.targetDescription}` : ""}
-${investigation.targetPhone ? `Phone: ${investigation.targetPhone}` : ""}
-Known links: ${investigation.knownLinks.join(", ") || "None provided"}
-${investigation.targetPhoto ? `Photo available: Yes` : "No photo provided"}
+          content: `Investigate this person.
 
-Begin your investigation. What's your first move?`,
+Available info summary:
+${infoLines.join("\n")}
+
+Begin your investigation. Adapt your strategy to the available information — what's your first move?`,
         },
       ]),
+      consecutiveSaveOnlySteps: 0,
     });
   },
 });
@@ -84,6 +229,7 @@ export const step = internalAction({
   args: {
     investigationId: v.id("investigations"),
     conversationHistory: v.string(),
+    consecutiveSaveOnlySteps: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const investigation = await ctx.runQuery(api.investigations.get, {
@@ -92,7 +238,6 @@ export const step = internalAction({
     if (!investigation) return;
     if (investigation.status === "complete" || investigation.status === "failed") return;
     if (investigation.stepCount >= MAX_STEPS) {
-      // Force report generation
       await generateReport(ctx, args.investigationId, args.conversationHistory);
       return;
     }
@@ -115,104 +260,7 @@ export const step = internalAction({
         max_tokens: 2048,
         system: SYSTEM_PROMPT,
         messages: conversationHistory,
-        tools: [
-          {
-            name: "maigret_search",
-            description:
-              "Intelligent OSINT search: searches a username across 3,000+ sites, then uses AI to extract connected handles/leads from profile bios and metadata (e.g. 'X: @handle' in a Telegram bio), and automatically searches those leads too. Returns primary profiles, extracted leads with reasoning, lead profiles, and a connection graph.",
-            input_schema: {
-              type: "object",
-              properties: {
-                username: {
-                  type: "string",
-                  description: "The username to search for",
-                },
-              },
-              required: ["username"],
-            },
-          },
-          {
-            name: "browser_action",
-            description:
-              "Control a web browser. Give natural language instructions. Returns screenshot and page text.",
-            input_schema: {
-              type: "object",
-              properties: {
-                instruction: {
-                  type: "string",
-                  description:
-                    'What to do in the browser, e.g. "Go to instagram.com/johndoe and describe what you see"',
-                },
-              },
-              required: ["instruction"],
-            },
-          },
-          {
-            name: "face_check",
-            description:
-              "Run facial recognition on an image URL. Returns matching profiles with confidence scores.",
-            input_schema: {
-              type: "object",
-              properties: {
-                imageUrl: {
-                  type: "string",
-                  description: "URL of the image to search faces in",
-                },
-              },
-              required: ["imageUrl"],
-            },
-          },
-          {
-            name: "save_finding",
-            description: "Save a confirmed finding from the investigation.",
-            input_schema: {
-              type: "object",
-              properties: {
-                source: {
-                  type: "string",
-                  description:
-                    'Where this finding came from: "instagram", "facecheck", "maigret", "browser", etc.',
-                },
-                category: {
-                  type: "string",
-                  enum: [
-                    "social",
-                    "connection",
-                    "location",
-                    "activity",
-                    "identity",
-                  ],
-                },
-                platform: { type: "string", description: "Platform name" },
-                profileUrl: { type: "string", description: "URL if applicable" },
-                data: {
-                  type: "string",
-                  description: "Description of the finding",
-                },
-                confidence: {
-                  type: "number",
-                  description: "Confidence 0-100",
-                },
-              },
-              required: ["source", "category", "data", "confidence"],
-            },
-          },
-          {
-            name: "done",
-            description:
-              "End the investigation and generate the final detective report.",
-            input_schema: {
-              type: "object",
-              properties: {
-                summary: {
-                  type: "string",
-                  description: "Brief summary of all findings",
-                },
-              },
-              required: ["summary"],
-            },
-          },
-        ],
+        tools: TOOL_DEFINITIONS,
       }),
     });
 
@@ -239,21 +287,20 @@ export const step = internalAction({
       });
     }
 
-    const stepNumber = await ctx.runMutation(api.investigations.incrementStep, {
-      id: args.investigationId,
-    });
-
-    // Process the response
+    // Issue 8: Collect ALL text and tool_use blocks (not just the last one)
     let reasoning = "";
-    let toolCall: ToolCall | null = null;
+    const toolCalls: ToolCall[] = [];
 
     for (const block of data.content) {
       if (block.type === "text") {
-        reasoning = block.text;
+        reasoning += (reasoning ? "\n" : "") + block.text;
       } else if (block.type === "tool_use") {
-        toolCall = { tool: block.name, args: block.input };
+        toolCalls.push({ id: block.id, tool: block.name, args: block.input });
       }
     }
+
+    // Use the current step count for logging (before any increment)
+    const stepNumber = investigation.stepCount + 1;
 
     // Log the reasoning step
     if (reasoning) {
@@ -265,193 +312,296 @@ export const step = internalAction({
       });
     }
 
-    if (!toolCall) {
+    if (toolCalls.length === 0) {
       // No tool call — might be done or confused
       await generateReport(ctx, args.investigationId, args.conversationHistory);
       return;
     }
 
-    // Execute the tool
-    let toolResult = "";
-
-    try {
-      switch (toolCall.tool) {
-        case "maigret_search": {
-          await ctx.runMutation(api.investigations.addStep, {
-            investigationId: args.investigationId,
-            stepNumber,
-            action: `Running intelligent OSINT search for "${toolCall.args.username}" — searching 3,000+ sites, extracting leads via AI, following connections`,
-            tool: "maigret",
-          });
-          const investigateResult = await ctx.runAction(
-            internal.tools.maigret.investigate,
-            {
-              username: toolCall.args.username as string,
-              targetName: investigation.targetName || undefined,
-              targetDescription: investigation.targetDescription || undefined,
-            }
-          );
-
-          // Format the results so Opus gets actionable intelligence
-          const formattedResult = formatInvestigationForOpus(investigateResult);
-          toolResult = formattedResult;
-
-          // Auto-save leads as findings
-          if (investigateResult.leads_extracted?.length > 0) {
-            for (const lead of investigateResult.leads_extracted.slice(0, 5)) {
-              await ctx.runMutation(api.investigations.addFinding, {
-                investigationId: args.investigationId,
-                source: "maigret",
-                category: "connection",
-                platform: lead.platform || undefined,
-                data: `Lead extracted: @${lead.username}${lead.platform ? ` on ${lead.platform}` : ""} — ${lead.reason}`,
-                confidence: 70,
-              });
-            }
-          }
-
-          // Log the AI analysis as a step
-          if (investigateResult.llm_analysis) {
-            await ctx.runMutation(api.investigations.addStep, {
-              investigationId: args.investigationId,
-              stepNumber,
-              action: `AI Lead Analysis: ${investigateResult.llm_analysis.slice(0, 500)}`,
-              tool: "reasoning",
-            });
-          }
-          break;
-        }
-
-        case "browser_action": {
-          await ctx.runMutation(api.investigations.addStep, {
-            investigationId: args.investigationId,
-            stepNumber,
-            action: `Browser: ${(toolCall.args.instruction as string).slice(0, 200)}`,
-            tool: "browser_action",
-          });
-          const browserResult = await ctx.runAction(
-            internal.tools.browserUse.runTask,
-            {
-              task: toolCall.args.instruction as string,
-              sessionId: investigation.browserSessionId ?? undefined,
-            }
-          );
-
-          // Use the task output text as the tool result for the LLM
-          toolResult = browserResult?.output ?? JSON.stringify(browserResult);
-
-          // If we didn't have a session before, fetch session details for liveUrl
-          if (!investigation.browserSessionId && browserResult?.sessionId) {
-            try {
-              const session = await ctx.runAction(
-                internal.tools.browserUse.getSession,
-                { sessionId: browserResult.sessionId }
-              );
-              await ctx.runMutation(api.investigations.updateBrowserSession, {
-                id: args.investigationId,
-                browserSessionId: browserResult.sessionId,
-                browserLiveUrl: session?.liveUrl,
-              });
-            } catch {
-              // Best-effort: store session_id even without liveUrl
-              await ctx.runMutation(api.investigations.updateBrowserSession, {
-                id: args.investigationId,
-                browserSessionId: browserResult.sessionId,
-              });
-            }
-          }
-          break;
-        }
-
-        case "face_check": {
-          await ctx.runMutation(api.investigations.addStep, {
-            investigationId: args.investigationId,
-            stepNumber,
-            action: `Running face recognition on image`,
-            tool: "face_check",
-          });
-          const faceResult = await ctx.runAction(
-            internal.tools.faceCheck.searchByImage,
-            { imageUrl: toolCall.args.imageUrl as string }
-          );
-          toolResult = JSON.stringify(faceResult);
-          break;
-        }
-
-        case "save_finding": {
-          const findingArgs = toolCall.args as {
-            source: string;
-            category: string;
-            platform?: string;
-            profileUrl?: string;
-            data: string;
-            confidence: number;
-          };
-          await ctx.runMutation(api.investigations.addFinding, {
-            investigationId: args.investigationId,
-            source: findingArgs.source,
-            category: findingArgs.category,
-            platform: findingArgs.platform,
-            profileUrl: findingArgs.profileUrl,
-            data: findingArgs.data,
-            confidence: findingArgs.confidence,
-          });
-          await ctx.runMutation(api.investigations.addStep, {
-            investigationId: args.investigationId,
-            stepNumber,
-            action: `Saved finding: ${findingArgs.data.slice(0, 200)}`,
-            tool: "save_finding",
-          });
-          toolResult = "Finding saved successfully.";
-          break;
-        }
-
-        case "done": {
-          await generateReport(ctx, args.investigationId, args.conversationHistory);
-          return;
-        }
-
-        default:
-          toolResult = `Unknown tool: ${toolCall.tool}`;
-      }
-    } catch (error) {
-      toolResult = `Tool error: ${error instanceof Error ? error.message : String(error)}`;
+    // Check for "done" tool — handle immediately
+    const doneCall = toolCalls.find((tc) => tc.tool === "done");
+    if (doneCall) {
+      await generateReport(ctx, args.investigationId, args.conversationHistory);
+      return;
     }
 
-    // Update step with result
-    await ctx.runMutation(api.investigations.addStep, {
-      investigationId: args.investigationId,
-      stepNumber,
-      action: `Result from ${toolCall.tool}`,
-      tool: toolCall.tool,
-      result: toolResult.slice(0, 2000),
-    });
+    // Issue 8: Execute ALL tool calls and collect results
+    const toolResults: { id: string; tool: string; result: string }[] = [];
+    let hasNonSaveFinding = false;
 
-    // Continue the conversation
+    for (const tc of toolCalls) {
+      if (tc.tool !== "save_finding") hasNonSaveFinding = true;
+      const result = await executeToolCall(ctx, {
+        investigationId: args.investigationId,
+        investigation,
+        toolCall: tc,
+        stepNumber,
+      });
+      toolResults.push({ id: tc.id, tool: tc.tool, result });
+    }
+
+    // Issue 5: Only increment step if at least one non-save_finding tool ran
+    let consecutiveSaveOnly = args.consecutiveSaveOnlySteps ?? 0;
+    if (hasNonSaveFinding) {
+      await ctx.runMutation(api.investigations.incrementStep, {
+        id: args.investigationId,
+      });
+      consecutiveSaveOnly = 0;
+    } else {
+      consecutiveSaveOnly++;
+      // Safety: prevent infinite save_finding-only loops
+      if (consecutiveSaveOnly >= MAX_CONSECUTIVE_SAVE_ONLY) {
+        await ctx.runMutation(api.investigations.incrementStep, {
+          id: args.investigationId,
+        });
+        consecutiveSaveOnly = 0;
+      }
+    }
+
+    // Log results for each tool
+    for (const tr of toolResults) {
+      await ctx.runMutation(api.investigations.addStep, {
+        investigationId: args.investigationId,
+        stepNumber,
+        action: `Result from ${tr.tool}`,
+        tool: tr.tool,
+        result: tr.result.slice(0, 2000),
+      });
+    }
+
+    // Issue 8: Build multi-tool conversation history with all tool_result blocks
+    const toolResultBlocks = toolResults.map((tr) => ({
+      type: "tool_result",
+      tool_use_id: tr.id,
+      content: tr.result.slice(0, 4000),
+    }));
+
     const updatedHistory = [
       ...conversationHistory,
       { role: "assistant", content: data.content },
-      {
-        role: "user",
-        content: [
-          {
-            type: "tool_result",
-            tool_use_id: data.content.find(
-              (b: { type: string }) => b.type === "tool_use"
-            )?.id,
-            content: toolResult.slice(0, 4000),
-          },
-        ],
-      },
+      { role: "user", content: toolResultBlocks },
     ];
 
     // Schedule the next step
     await ctx.scheduler.runAfter(0, internal.orchestrator.step, {
       investigationId: args.investigationId,
       conversationHistory: JSON.stringify(updatedHistory),
+      consecutiveSaveOnlySteps: consecutiveSaveOnly,
     });
   },
 });
+
+// Issue 8: Extracted helper so it can be called in a loop for each tool call
+async function executeToolCall(
+  ctx: Pick<ActionCtx, "runQuery" | "runMutation" | "runAction">,
+  params: {
+    investigationId: string;
+    investigation: {
+      targetName: string;
+      targetDescription?: string;
+      browserSessionId?: string;
+    };
+    toolCall: ToolCall;
+    stepNumber: number;
+  }
+): Promise<string> {
+  const { investigationId, investigation, toolCall, stepNumber } = params;
+  const idTyped = investigationId as any;
+
+  try {
+    switch (toolCall.tool) {
+      case "maigret_search": {
+        await ctx.runMutation(api.investigations.addStep, {
+          investigationId: idTyped,
+          stepNumber,
+          action: `Running intelligent OSINT search for "${toolCall.args.username}" — searching 3,000+ sites, extracting leads via AI, following connections`,
+          tool: "maigret",
+        });
+        const investigateResult = await ctx.runAction(
+          internal.tools.maigret.investigate,
+          {
+            username: toolCall.args.username as string,
+            targetName: investigation.targetName || undefined,
+            targetDescription: investigation.targetDescription || undefined,
+          }
+        );
+
+        const formattedResult = formatInvestigationForOpus(investigateResult);
+
+        // Auto-save leads as findings
+        if (investigateResult.leads_extracted?.length > 0) {
+          for (const lead of investigateResult.leads_extracted.slice(0, 5)) {
+            await ctx.runMutation(api.investigations.addFinding, {
+              investigationId: idTyped,
+              source: "maigret",
+              category: "connection",
+              platform: lead.platform || undefined,
+              data: `Lead extracted: @${lead.username}${lead.platform ? ` on ${lead.platform}` : ""} — ${lead.reason}`,
+              confidence: 70,
+            });
+          }
+        }
+
+        if (investigateResult.llm_analysis) {
+          await ctx.runMutation(api.investigations.addStep, {
+            investigationId: idTyped,
+            stepNumber,
+            action: `AI Lead Analysis: ${investigateResult.llm_analysis.slice(0, 500)}`,
+            tool: "reasoning",
+          });
+        }
+        return formattedResult;
+      }
+
+      case "browser_action": {
+        await ctx.runMutation(api.investigations.addStep, {
+          investigationId: idTyped,
+          stepNumber,
+          action: `Browser: ${(toolCall.args.instruction as string).slice(0, 200)}`,
+          tool: "browser_action",
+        });
+
+        // Re-read investigation to get latest browserSessionId
+        const freshInvestigation = await ctx.runQuery(api.investigations.get, {
+          id: idTyped,
+        });
+        const sessionId = freshInvestigation?.browserSessionId ?? undefined;
+
+        let browserResult;
+        try {
+          browserResult = await ctx.runAction(
+            internal.tools.browserUse.runTask,
+            {
+              task: toolCall.args.instruction as string,
+              sessionId,
+            }
+          );
+        } catch (error) {
+          // Issue 4: If session expired (400), create a new one and retry once
+          const errMsg = error instanceof Error ? error.message : String(error);
+          if (
+            errMsg.includes("BROWSER_TASK_CREATION_FAILED:400") &&
+            sessionId
+          ) {
+            console.warn("Browser session expired, creating fresh session...");
+            try {
+              const newSession = await ctx.runAction(
+                internal.tools.browserUse.createSession,
+                {}
+              );
+              if (newSession?.id) {
+                await ctx.runMutation(api.investigations.updateBrowserSession, {
+                  id: idTyped,
+                  browserSessionId: newSession.id,
+                  browserLiveUrl: newSession.liveUrl,
+                });
+              }
+              // Retry with the new session
+              browserResult = await ctx.runAction(
+                internal.tools.browserUse.runTask,
+                {
+                  task: toolCall.args.instruction as string,
+                  sessionId: newSession?.id,
+                }
+              );
+            } catch (retryError) {
+              return `Tool error (browser retry failed): ${retryError instanceof Error ? retryError.message : String(retryError)}`;
+            }
+          } else {
+            throw error;
+          }
+        }
+
+        const toolResult = browserResult?.output ?? JSON.stringify(browserResult);
+
+        // If we didn't have a session before, store the new one
+        if (!sessionId && browserResult?.sessionId) {
+          try {
+            const session = await ctx.runAction(
+              internal.tools.browserUse.getSession,
+              { sessionId: browserResult.sessionId }
+            );
+            await ctx.runMutation(api.investigations.updateBrowserSession, {
+              id: idTyped,
+              browserSessionId: browserResult.sessionId,
+              browserLiveUrl: session?.liveUrl,
+            });
+          } catch {
+            await ctx.runMutation(api.investigations.updateBrowserSession, {
+              id: idTyped,
+              browserSessionId: browserResult.sessionId,
+            });
+          }
+        }
+        return toolResult;
+      }
+
+      case "face_check": {
+        await ctx.runMutation(api.investigations.addStep, {
+          investigationId: idTyped,
+          stepNumber,
+          action: `Running face recognition on image`,
+          tool: "face_check",
+        });
+        const faceResult = await ctx.runAction(
+          internal.tools.faceCheck.searchByImage,
+          { imageUrl: toolCall.args.imageUrl as string }
+        );
+        return JSON.stringify(faceResult);
+      }
+
+      // Issue 6: New web_search tool using Brave Search API
+      case "web_search": {
+        await ctx.runMutation(api.investigations.addStep, {
+          investigationId: idTyped,
+          stepNumber,
+          action: `Web search: "${(toolCall.args.query as string).slice(0, 200)}"`,
+          tool: "web_search",
+        });
+        const searchResult = await ctx.runAction(
+          internal.tools.braveSearch.search,
+          {
+            query: toolCall.args.query as string,
+            count: (toolCall.args.count as number) ?? undefined,
+          }
+        );
+        return JSON.stringify(searchResult);
+      }
+
+      case "save_finding": {
+        const findingArgs = toolCall.args as {
+          source: string;
+          category: string;
+          platform?: string;
+          profileUrl?: string;
+          data: string;
+          confidence: number;
+        };
+        await ctx.runMutation(api.investigations.addFinding, {
+          investigationId: idTyped,
+          source: findingArgs.source,
+          category: findingArgs.category,
+          platform: findingArgs.platform,
+          profileUrl: findingArgs.profileUrl,
+          data: findingArgs.data,
+          confidence: findingArgs.confidence,
+        });
+        await ctx.runMutation(api.investigations.addStep, {
+          investigationId: idTyped,
+          stepNumber,
+          action: `Saved finding: ${findingArgs.data.slice(0, 200)}`,
+          tool: "save_finding",
+        });
+        return "Finding saved successfully.";
+      }
+
+      default:
+        return `Unknown tool: ${toolCall.tool}`;
+    }
+  } catch (error) {
+    return `Tool error: ${error instanceof Error ? error.message : String(error)}`;
+  }
+}
 
 async function generateReport(
   ctx: Pick<ActionCtx, "runQuery" | "runMutation" | "runAction">,
@@ -548,12 +698,10 @@ function formatInvestigationForOpus(result: {
 }): string {
   const sections: string[] = [];
 
-  // Header
   sections.push(`=== OSINT Investigation: @${result.primary_username} ===`);
   sections.push(`Total profiles found: ${result.total_profiles}`);
   if (result.error) sections.push(`⚠ Error: ${result.error}`);
 
-  // Primary profiles
   sections.push(`\n--- Primary Profiles (username: ${result.primary_username}) ---`);
   for (const [site, profile] of Object.entries(result.primary_profiles)) {
     const p = profile as Record<string, unknown>;
@@ -569,13 +717,11 @@ function formatInvestigationForOpus(result: {
     sections.push(details.join("\n"));
   }
 
-  // AI analysis
   if (result.llm_analysis) {
     sections.push(`\n--- AI Analysis ---`);
     sections.push(result.llm_analysis);
   }
 
-  // Extracted leads
   if (result.leads_extracted.length > 0) {
     sections.push(`\n--- Extracted Leads (${result.leads_extracted.length} found) ---`);
     for (const lead of result.leads_extracted) {
@@ -585,7 +731,6 @@ function formatInvestigationForOpus(result: {
     }
   }
 
-  // Lead profiles (results from searching the leads)
   const leadUsernames = Object.keys(result.lead_profiles);
   if (leadUsernames.length > 0) {
     sections.push(`\n--- Lead Search Results ---`);
@@ -602,7 +747,6 @@ function formatInvestigationForOpus(result: {
     }
   }
 
-  // Connection graph
   if (result.lead_graph.length > 0) {
     sections.push(`\n--- Connection Graph ---`);
     for (const edge of result.lead_graph) {
@@ -613,6 +757,29 @@ function formatInvestigationForOpus(result: {
   }
 
   return sections.join("\n");
+}
+
+function extractUsernamesFromLinks(links: string[]): string[] {
+  const usernames: string[] = [];
+  for (const link of links) {
+    try {
+      const url = new URL(link);
+      const pathParts = url.pathname.split("/").filter(Boolean);
+      if (pathParts.length > 0) {
+        const username = pathParts[pathParts.length - 1].replace(/^@/, "");
+        if (username && !username.includes(".") && username.length > 1) {
+          usernames.push(`@${username}`);
+        }
+      }
+    } catch {
+      // Not a URL, might be a raw username
+      const cleaned = link.trim().replace(/^@/, "");
+      if (cleaned && !cleaned.includes(" ") && cleaned.length > 1) {
+        usernames.push(`@${cleaned}`);
+      }
+    }
+  }
+  return [...new Set(usernames)];
 }
 
 async function cleanupBrowserSession(
