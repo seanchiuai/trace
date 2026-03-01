@@ -16,14 +16,18 @@ export const findPerson = internalAction({
       throw new Error("At least one of name or phone is required");
     }
 
-    const params = new URLSearchParams({ api_key: apiKey });
+    // Build query params (v1 API)
+    const params = new URLSearchParams();
     if (args.name) params.set("name", args.name);
     if (args.phone) params.set("phone", args.phone);
-    if (args.city) params.set("address.city", args.city);
-    if (args.stateCode) params.set("address.state_code", args.stateCode);
+    if (args.city) params.set("city", args.city);
+    if (args.stateCode) params.set("state_code", args.stateCode);
 
     const res = await fetch(
-      `https://proapi.whitepages.com/3.0/person?${params.toString()}`
+      `https://api.whitepages.com/v1/person?${params.toString()}`,
+      {
+        headers: { "X-Api-Key": apiKey },
+      }
     );
 
     if (!res.ok) {
@@ -34,30 +38,42 @@ export const findPerson = internalAction({
 
     const data = await res.json();
 
-    // Normalize the response into a consistent shape
-    const results = (data.person || []).map((person: any) => ({
-      name: person.name || null,
-      age: person.age_range || null,
-      phones: (person.phones || []).map((p: any) => ({
-        number: p.phone_number || null,
-        type: p.line_type || null,
-        carrier: p.carrier || null,
+    // v1 API returns a top-level array of person records
+    const persons = Array.isArray(data) ? data : [];
+
+    const results = persons.map((person: Record<string, unknown>) => ({
+      name: (person.name as string) || null,
+      aliases: (person.aliases as string[]) || [],
+      isDead: person.is_dead ?? null,
+      dateOfBirth: (person.date_of_birth as string) || null,
+      // Addresses come as { id, address } where address is a full string
+      currentAddresses: (
+        (person.current_addresses as Array<{ id: string; address: string }>) ||
+        []
+      ).map((a) => a.address),
+      historicAddresses: (
+        (person.historic_addresses as Array<{ id: string; address: string }>) ||
+        []
+      ).map((a) => a.address),
+      ownedProperties: (
+        (person.owned_properties as Array<{ id: string; address: string }>) ||
+        []
+      ).map((a) => a.address),
+      phones: (
+        (person.phones as Array<{ number: string; type: string; score: number }>) ||
+        []
+      ).map((p) => ({
+        number: p.number || null,
+        type: p.type || null,
+        score: p.score ?? null,
       })),
-      addresses: (person.found_at_address
-        ? [person.found_at_address, ...(person.historical_addresses || [])]
-        : person.historical_addresses || []
-      ).map((addr: any) => ({
-        address: addr.street_line_1 || null,
-        city: addr.city || null,
-        state: addr.state_code || null,
-        zip: addr.postal_code || null,
-        lat: addr.lat_long?.latitude ?? null,
-        lng: addr.lat_long?.longitude ?? null,
-      })),
-      associatedPeople: (person.associated_people || []).map((ap: any) => ({
-        name: ap.name || null,
-        relation: ap.relation || null,
-      })),
+      emails: (person.emails as string[]) || [],
+      linkedinUrl: (person.linkedin_url as string) || null,
+      company: (person.company_name as string) || null,
+      jobTitle: (person.job_title as string) || null,
+      relatives: (
+        (person.relatives as Array<{ id: string; name: string }>) || []
+      ).map((r) => r.name),
     }));
 
     return { results, query: args };

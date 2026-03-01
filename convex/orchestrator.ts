@@ -47,7 +47,7 @@ function buildSystemPrompt(maigretAvailable: boolean, extremeMode: boolean = fal
   }
   if (extremeMode && isEnabled(TOOL_NAMES.WHITEPAGES_LOOKUP)) {
     toolLines.push(
-      `${n++}. whitepages_lookup(name?, phone?, city?, stateCode?) - Deep person lookup. Returns addresses, age, phones, associates.`
+      `${n++}. whitepages_lookup(name?, phone?, city?, stateCode?) - Deep person lookup. Returns current/historic addresses, owned properties, phones, emails, employer, LinkedIn, relatives.`
     );
   }
   if (extremeMode && isEnabled(TOOL_NAMES.DARKWEB_SEARCH)) {
@@ -965,22 +965,22 @@ async function executeToolCall(
           city: toolCall.args.city as string | undefined,
           stateCode: toolCall.args.stateCode as string | undefined,
         });
-        // Auto-save location findings with lat/lng from address data
+        // Auto-save address findings from WhitePages results
         if (wpResult.results && Array.isArray(wpResult.results)) {
           for (const person of wpResult.results.slice(0, 3)) {
-            if (person.addresses && Array.isArray(person.addresses)) {
-              for (const addr of person.addresses.slice(0, 2)) {
-                if (addr.city || addr.state) {
-                  await ctx.runMutation(api.investigations.addFinding, {
-                    investigationId,
-                    source: "whitepages",
-                    category: "location",
-                    data: `Address: ${addr.address || ""} ${addr.city || ""}, ${addr.state || ""} ${addr.zip || ""}`.trim(),
-                    confidence: 65,
-                    latitude: typeof addr.lat === "number" ? addr.lat : undefined,
-                    longitude: typeof addr.lng === "number" ? addr.lng : undefined,
-                  });
-                }
+            const allAddresses = [
+              ...(person.currentAddresses || []),
+              ...(person.historicAddresses || []),
+            ];
+            for (const addr of allAddresses.slice(0, 3)) {
+              if (addr) {
+                await ctx.runMutation(api.investigations.addFinding, {
+                  investigationId,
+                  source: "whitepages",
+                  category: "location",
+                  data: `Address: ${addr}`,
+                  confidence: 65,
+                });
               }
             }
           }
