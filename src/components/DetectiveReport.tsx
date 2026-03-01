@@ -7,6 +7,7 @@ interface Finding {
   category: string;
   platform?: string;
   profileUrl?: string;
+  imageUrl?: string;
   data: string;
   confidence: number;
 }
@@ -174,20 +175,23 @@ function SectionHeader({ label, count, delay = 0 }: { label: string; count?: num
 
 /* ─── Evidence Card ─── */
 
-function EvidenceCard({ finding, index }: { finding: Finding; index: number }) {
+function EvidenceCard({ finding, index, onImageClick }: { finding: Finding; index: number; onImageClick?: (finding: Finding) => void }) {
   const style = CATEGORY_STYLE[finding.category] || CATEGORY_STYLE.identity;
+  const [imgFailed, setImgFailed] = useState(false);
 
   let confColor = "text-danger";
   if (finding.confidence >= 80) confColor = "text-accent";
   else if (finding.confidence >= 60) confColor = "text-warning";
   else if (finding.confidence >= 40) confColor = "text-orange-400";
 
+  const hasImage = finding.imageUrl && !imgFailed;
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 16, scale: 0.97 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ duration: 0.4, delay: 0.05 * index, ease: "easeOut" }}
-      className="relative group bg-bg-card/50 border border-border/40 rounded-xl p-4 hover:border-border-bright hover:bg-bg-card-hover transition-all duration-300"
+      className="relative group bg-bg-card/50 border border-border/40 rounded-xl overflow-hidden hover:border-border-bright hover:bg-bg-card-hover transition-all duration-300"
     >
       {/* Scan line effect on hover */}
       <div className="absolute inset-0 rounded-xl overflow-hidden pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity">
@@ -197,60 +201,175 @@ function EvidenceCard({ finding, index }: { finding: Finding; index: number }) {
         />
       </div>
 
-      {/* Top row */}
-      <div className="flex items-center justify-between gap-2 mb-2.5">
-        <div className="flex items-center gap-2">
-          <div className={`w-2 h-2 rounded-full ${style.dot}`} />
-          <span className={`text-[9px] px-2 py-0.5 rounded-full ${style.bg} ${style.text} border ${style.border} tracking-[0.15em] uppercase font-mono font-medium`}>
-            {style.label}
-          </span>
-          {finding.platform && (
-            <span className="text-[10px] text-text-muted/60 font-mono">
-              // {finding.platform}
-            </span>
-          )}
-        </div>
-        <div className="flex items-center gap-1.5">
-          <div className="w-8 h-1 bg-bg-primary rounded-full overflow-hidden">
-            <div
-              className={`h-full rounded-full ${finding.confidence >= 80 ? "bg-accent" : finding.confidence >= 60 ? "bg-yellow-400" : finding.confidence >= 40 ? "bg-orange-400" : "bg-danger"}`}
-              style={{ width: `${finding.confidence}%` }}
-            />
-          </div>
-          <span className={`text-[10px] font-bold font-mono tabular-nums ${confColor}`}>
-            {finding.confidence}%
-          </span>
-        </div>
-      </div>
-
-      {/* Content */}
-      <p className="text-[13px] text-text-primary leading-relaxed">
-        {finding.data}
-      </p>
-
-      {/* Footer */}
-      <div className="flex items-center gap-3 mt-3 text-[10px] text-text-muted/40 font-mono">
-        <span className="flex items-center gap-1">
-          <span className="text-text-muted/20">SRC:</span> {finding.source}
-        </span>
-        {finding.profileUrl && (
-          <a
-            href={finding.profileUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-accent/50 hover:text-accent transition-colors inline-flex items-center gap-1"
+      <div className={hasImage ? "flex" : ""}>
+        {/* Image thumbnail */}
+        {hasImage && (
+          <div
+            className="relative w-28 shrink-0 bg-bg-primary cursor-pointer"
+            onClick={() => onImageClick?.(finding)}
           >
-            <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-            </svg>
-            open
-          </a>
+            <img
+              src={finding.imageUrl}
+              alt={finding.data.slice(0, 80)}
+              className="w-full h-full object-cover"
+              loading="lazy"
+              referrerPolicy="no-referrer"
+              onError={() => setImgFailed(true)}
+            />
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent to-bg-card/50 pointer-events-none" />
+            {/* Zoom icon on hover */}
+            <div className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/30 transition-colors">
+              <svg className="w-5 h-5 text-white opacity-0 group-hover:opacity-80 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" />
+              </svg>
+            </div>
+          </div>
         )}
+
+        <div className="flex-1 p-4 min-w-0">
+          {/* Top row */}
+          <div className="flex items-center justify-between gap-2 mb-2.5">
+            <div className="flex items-center gap-2">
+              <div className={`w-2 h-2 rounded-full ${style.dot}`} />
+              <span className={`text-[9px] px-2 py-0.5 rounded-full ${style.bg} ${style.text} border ${style.border} tracking-[0.15em] uppercase font-mono font-medium`}>
+                {style.label}
+              </span>
+              {finding.platform && (
+                <span className="text-[10px] text-text-muted/60 font-mono">
+                  // {finding.platform}
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-8 h-1 bg-bg-primary rounded-full overflow-hidden">
+                <div
+                  className={`h-full rounded-full ${finding.confidence >= 80 ? "bg-accent" : finding.confidence >= 60 ? "bg-yellow-400" : finding.confidence >= 40 ? "bg-orange-400" : "bg-danger"}`}
+                  style={{ width: `${finding.confidence}%` }}
+                />
+              </div>
+              <span className={`text-[10px] font-bold font-mono tabular-nums ${confColor}`}>
+                {finding.confidence}%
+              </span>
+            </div>
+          </div>
+
+          {/* Content */}
+          <p className="text-[13px] text-text-primary leading-relaxed">
+            {finding.data}
+          </p>
+
+          {/* Footer */}
+          <div className="flex items-center gap-3 mt-3 text-[10px] text-text-muted/40 font-mono">
+            <span className="flex items-center gap-1">
+              <span className="text-text-muted/20">SRC:</span> {finding.source}
+            </span>
+            {finding.profileUrl && (
+              <a
+                href={finding.profileUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-accent/50 hover:text-accent transition-colors inline-flex items-center gap-1"
+              >
+                <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                </svg>
+                open
+              </a>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Corner accents */}
       <div className="absolute top-0 left-0 w-2.5 h-2.5 border-t border-l border-accent/15 rounded-tl-xl pointer-events-none" />
       <div className="absolute bottom-0 right-0 w-2.5 h-2.5 border-b border-r border-accent/15 rounded-br-xl pointer-events-none" />
+    </motion.div>
+  );
+}
+
+/* ─── Gallery Card ─── */
+
+function GalleryCard({
+  finding,
+  index,
+  catStyle,
+  onImageClick,
+}: {
+  finding: Finding;
+  index: number;
+  catStyle?: { dot: string; text: string; bg: string; border: string; label: string };
+  onImageClick: (finding: Finding) => void;
+}) {
+  const [imgFailed, setImgFailed] = useState(false);
+
+  if (imgFailed) return null;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.9 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ duration: 0.3, delay: index * 0.05 }}
+      className="group relative border border-border rounded-lg overflow-hidden bg-bg-secondary hover:border-accent/30 transition-colors cursor-pointer"
+      onClick={() => onImageClick(finding)}
+    >
+      {/* Image */}
+      <div className="relative aspect-square bg-bg-primary">
+        <img
+          src={finding.imageUrl}
+          alt={finding.data.slice(0, 100)}
+          className="w-full h-full object-cover"
+          loading="lazy"
+          referrerPolicy="no-referrer"
+          onError={() => setImgFailed(true)}
+        />
+        {/* Zoom overlay on hover */}
+        <div className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/30 transition-colors">
+          <svg className="w-6 h-6 text-white opacity-0 group-hover:opacity-80 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" />
+          </svg>
+        </div>
+        {/* Category badge */}
+        {catStyle && (
+          <span
+            className={`absolute top-1.5 right-1.5 text-[8px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider ${catStyle.bg} ${catStyle.text} border ${catStyle.border}`}
+          >
+            {catStyle.label}
+          </span>
+        )}
+        {/* Confidence badge */}
+        <span
+          className={`absolute top-1.5 left-1.5 text-[9px] px-1.5 py-0.5 rounded font-mono font-bold ${
+            finding.confidence >= 80
+              ? "bg-accent/20 text-accent"
+              : finding.confidence >= 60
+                ? "bg-yellow-400/20 text-yellow-400"
+                : "bg-red-400/20 text-red-400"
+          }`}
+        >
+          {finding.confidence}%
+        </span>
+      </div>
+      {/* Caption */}
+      <div className="p-2">
+        <p className="text-[10px] text-text-secondary leading-tight line-clamp-2">
+          {finding.data.slice(0, 120)}
+        </p>
+        {finding.platform && (
+          <p className="text-[9px] text-text-muted mt-1 uppercase tracking-wider">
+            {finding.platform}
+          </p>
+        )}
+        {finding.profileUrl && (
+          <a
+            href={finding.profileUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-[9px] text-accent hover:underline mt-0.5 block truncate"
+          >
+            {finding.profileUrl}
+          </a>
+        )}
+      </div>
     </motion.div>
   );
 }
@@ -305,6 +424,7 @@ export default function DetectiveReport({
 }: DetectiveReportProps) {
   const [activeCategory, setActiveCategory] = useState<string>("all");
   const [showFullReport, setShowFullReport] = useState(false);
+  const [lightboxImage, setLightboxImage] = useState<Finding | null>(null);
 
   const categories = ["all", "social", "connection", "location", "activity", "identity"];
   const filteredFindings =
@@ -326,6 +446,76 @@ export default function DetectiveReport({
 
   return (
     <div className="min-h-screen bg-bg-primary relative">
+      {/* ═══ IMAGE LIGHTBOX ═══ */}
+      <AnimatePresence>
+        {lightboxImage && lightboxImage.imageUrl && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm cursor-pointer"
+            onClick={() => setLightboxImage(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              transition={{ duration: 0.25, ease: "easeOut" }}
+              className="relative max-w-4xl max-h-[85vh] mx-4 cursor-default"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <img
+                src={lightboxImage.imageUrl}
+                alt={lightboxImage.data.slice(0, 100)}
+                className="max-w-full max-h-[75vh] object-contain rounded-lg border border-border/40"
+                referrerPolicy="no-referrer"
+              />
+              {/* Image info bar */}
+              <div className="mt-3 bg-bg-card/80 border border-border/40 rounded-lg p-3 backdrop-blur-sm">
+                <div className="flex items-center gap-2 mb-1.5">
+                  {CATEGORY_STYLE[lightboxImage.category] && (
+                    <span className={`text-[9px] px-2 py-0.5 rounded-full ${CATEGORY_STYLE[lightboxImage.category].bg} ${CATEGORY_STYLE[lightboxImage.category].text} border ${CATEGORY_STYLE[lightboxImage.category].border} tracking-[0.15em] uppercase font-mono font-medium`}>
+                      {CATEGORY_STYLE[lightboxImage.category].label}
+                    </span>
+                  )}
+                  <span className={`text-[10px] font-bold font-mono tabular-nums ${lightboxImage.confidence >= 80 ? "text-accent" : lightboxImage.confidence >= 60 ? "text-warning" : "text-danger"}`}>
+                    {lightboxImage.confidence}%
+                  </span>
+                  {lightboxImage.platform && (
+                    <span className="text-[10px] text-text-muted/60 font-mono">
+                      {lightboxImage.platform}
+                    </span>
+                  )}
+                </div>
+                <p className="text-[12px] text-text-secondary leading-relaxed line-clamp-2">
+                  {lightboxImage.data}
+                </p>
+                {lightboxImage.profileUrl && (
+                  <a
+                    href={lightboxImage.profileUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[10px] text-accent/60 hover:text-accent font-mono mt-1.5 inline-block transition-colors"
+                  >
+                    {lightboxImage.profileUrl}
+                  </a>
+                )}
+              </div>
+              {/* Close button */}
+              <button
+                onClick={() => setLightboxImage(null)}
+                className="absolute -top-3 -right-3 w-8 h-8 rounded-full bg-bg-card border border-border flex items-center justify-center text-text-muted hover:text-text-primary hover:border-accent/40 transition-colors cursor-pointer"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Background grid */}
       <div
         className="fixed inset-0 pointer-events-none opacity-20"
@@ -607,7 +797,7 @@ export default function DetectiveReport({
               className="grid grid-cols-1 md:grid-cols-2 gap-3"
             >
               {filteredFindings.map((finding, i) => (
-                <EvidenceCard key={finding._id} finding={finding} index={i} />
+                <EvidenceCard key={finding._id} finding={finding} index={i} onImageClick={setLightboxImage} />
               ))}
             </motion.div>
           </AnimatePresence>
@@ -620,6 +810,37 @@ export default function DetectiveReport({
             </div>
           )}
         </motion.div>
+
+        {/* ── Visual Evidence Gallery ── */}
+        {findings.some((f) => f.imageUrl) && (
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.7 }}
+          >
+            <SectionHeader
+              label="Visual Evidence"
+              count={findings.filter((f) => f.imageUrl).length}
+              delay={0.7}
+            />
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+              {findings
+                .filter((f) => f.imageUrl)
+                .map((finding, i) => {
+                  const catStyle = CATEGORY_STYLE[finding.category];
+                  return (
+                    <GalleryCard
+                      key={finding._id + "-img"}
+                      finding={finding}
+                      index={i}
+                      catStyle={catStyle}
+                      onImageClick={setLightboxImage}
+                    />
+                  );
+                })}
+            </div>
+          </motion.div>
+        )}
 
         {/* ── Operation Timeline ── */}
         {steps && steps.length > 0 && (

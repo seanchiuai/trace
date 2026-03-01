@@ -24,7 +24,7 @@ function buildSystemPrompt(maigretAvailable: boolean): string {
   toolLines.push(
     `${n++}. browser_action(instruction) — Control a web browser. Give clear instructions like "Go to imginn.com/username and report what you see." IMPORTANT: For Instagram profiles, ALWAYS use imginn.com (e.g. imginn.com/username) instead of instagram.com — it shows public profiles without login walls. Returns screenshots and page text. Use for interactive pages that require scrolling or JS rendering. EXPENSIVE — prefer web_search for simple lookups.`,
     `${n++}. web_search(query, count?) — Fast web search. Returns titles, URLs, and snippets. Use this FIRST for simple lookups like "John Smith LinkedIn", "username site:twitter.com", company info, news articles, etc. Much faster and cheaper than browser_action.`,
-    `${n++}. save_finding(source, category, platform, data, confidence) — Save a confirmed finding. Categories: "social", "connection", "location", "activity", "identity". FREE — does not count toward your step budget. Save findings liberally as you discover them.`,
+    `${n++}. save_finding(source, category, platform, data, confidence, imageUrl?, profileUrl?) — Save a confirmed finding. Categories: "social", "connection", "location", "activity", "identity". FREE — does not count toward your step budget. Save findings liberally as you discover them. IMPORTANT: When you find profile photos, post images, or any visual evidence, ALWAYS include the imageUrl. On imginn.com, image URLs look like "https://imginn.com/p/..." or CDN URLs from the page.`,
     `${n++}. done(report) — End the investigation and generate the final report.`
   );
 
@@ -115,6 +115,7 @@ const TOOL_DEFINITIONS = [
         category: { type: "string", enum: ["social", "connection", "location", "activity", "identity"] },
         platform: { type: "string", description: "Platform name" },
         profileUrl: { type: "string", description: "URL if applicable" },
+        imageUrl: { type: "string", description: "URL of a relevant image (profile photo, post image, etc.). Always include when available." },
         data: { type: "string", description: "Description of the finding" },
         confidence: { type: "number", description: "Confidence 0-100" },
       },
@@ -446,6 +447,7 @@ async function executeToolCall(
           category: string;
           platform?: string;
           profileUrl?: string;
+          imageUrl?: string;
           data: string;
           confidence: number;
         };
@@ -455,6 +457,7 @@ async function executeToolCall(
           category: findingArgs.category,
           platform: findingArgs.platform,
           profileUrl: findingArgs.profileUrl,
+          imageUrl: findingArgs.imageUrl,
           data: findingArgs.data,
           confidence: findingArgs.confidence,
         });
