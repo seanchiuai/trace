@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import type { Id } from "../../convex/_generated/dataModel";
 import FindingsGrid from "./FindingsGrid";
 
 interface Finding {
-  _id: string;
+  _id: Id<"findings">;
   source: string;
   category: string;
   platform?: string;
@@ -12,6 +13,11 @@ interface Finding {
   data: string;
   confidence: number;
   createdAt: number;
+}
+
+interface Directive {
+  findingId?: Id<"findings">;
+  type: "kill_lead" | "general";
 }
 
 const CATEGORY_DOT: Record<string, string> = {
@@ -32,9 +38,12 @@ const CATEGORY_TEXT: Record<string, string> = {
 
 interface FindingToastsProps {
   findings: Finding[];
+  investigationId?: Id<"investigations">;
+  isLive?: boolean;
+  directives?: Directive[];
 }
 
-export default function FindingToasts({ findings }: FindingToastsProps) {
+export default function FindingToasts({ findings, investigationId, isLive, directives }: FindingToastsProps) {
   const [visibleToasts, setVisibleToasts] = useState<Finding[]>([]);
   const [trayOpen, setTrayOpen] = useState(false);
   const seenIdsRef = useRef<Set<string>>(new Set());
@@ -204,7 +213,7 @@ export default function FindingToasts({ findings }: FindingToastsProps) {
                   </svg>
                 </button>
               </div>
-              <FindingsGrid findings={findings} />
+              <FindingsGrid findings={findings} investigationId={investigationId} isLive={isLive} directives={directives} />
             </motion.div>
           </>
         )}

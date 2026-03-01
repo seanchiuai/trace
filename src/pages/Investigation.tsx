@@ -14,6 +14,7 @@ import type { ViewMode } from "../components/ViewSwitcher";
 import RelationshipGraph from "../components/RelationshipGraph";
 import GeoIntelMap from "../components/GeoIntelMap";
 import ClarificationCard from "../components/ClarificationCard";
+import SteeringInput from "../components/SteeringInput";
 import { useGraphData } from "../hooks/useGraphData";
 
 const STATUS_CONFIG: Record<
@@ -80,6 +81,9 @@ export default function Investigation() {
   });
   const startInvestigation = useAction(api.orchestrator.startInvestigation);
   const stopInvestigation = useAction(api.orchestrator.stopInvestigation);
+  const directives = useQuery(api.directives.getDirectives, {
+    investigationId,
+  });
   const pendingClarification = useQuery(api.investigations.getPendingClarification, {
     investigationId,
   });
@@ -254,17 +258,21 @@ export default function Investigation() {
       />
 
       {/* Layer 3: Finding toasts */}
-      <FindingToasts findings={findings || []} />
+      <FindingToasts findings={findings || []} investigationId={investigationId} isLive={isLive} directives={directives} />
 
-      {/* Layer 4: Command strip */}
+      {/* Layer 4: Steering input */}
+      <SteeringInput investigationId={investigationId} isLive={isLive} />
+
+      {/* Layer 5: Command strip */}
       <CommandStrip
         steps={steps || []}
+        directives={directives || []}
         isLive={isLive}
         progress={progress}
         onStop={handleStop}
       />
 
-      {/* Layer 5: Clarification overlay */}
+      {/* Layer 6: Clarification overlay */}
       <AnimatePresence>
         {pendingClarification && investigation.status === "awaiting_input" && (
           <ClarificationCard
@@ -277,7 +285,7 @@ export default function Investigation() {
         )}
       </AnimatePresence>
 
-      {/* Layer 6: Completion cinematic flash */}
+      {/* Layer 7: Completion cinematic flash */}
       <AnimatePresence>
         {showCompletion && (
           <CompletionFlash
