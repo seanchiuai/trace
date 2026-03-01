@@ -344,7 +344,7 @@ export const startInvestigation = action({
     if (investigation.knownLinks.length > 0)
       infoLines.push(`Known links: ${investigation.knownLinks.join(", ")}`);
     if (investigation.targetPhoto)
-      infoLines.push(`Photo available: Yes`);
+      infoLines.push(`Photo URL: ${investigation.targetPhoto}`);
     else
       infoLines.push(`No photo provided`);
 
