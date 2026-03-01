@@ -22,7 +22,7 @@ function buildSystemPrompt(maigretAvailable: boolean, extremeMode: boolean = fal
     );
   }
   toolLines.push(
-    `${n++}. browser_action(instruction) — Control a web browser. Give clear instructions like "Go to imginn.com/username and report what you see." IMPORTANT: For Instagram profiles, ALWAYS use imginn.com (e.g. imginn.com/username) instead of instagram.com — it shows public profiles without login walls. Returns screenshots and page text. Use for interactive pages that require scrolling or JS rendering. EXPENSIVE — prefer web_search for simple lookups.`,
+    `${n++}. browser_action(instruction) — Control a web browser. Give clear instructions like "Go to imginn.com/username and report what you see." IMPORTANT: Most social media sites (Instagram, LinkedIn, Facebook, Twitter) have login walls — NEVER browse them directly. Use proxy viewer sites instead (see Login Wall Avoidance in strategy). Returns screenshots and page text. Use for interactive pages that require scrolling or JS rendering. EXPENSIVE — prefer web_search for simple lookups.`,
     `${n++}. web_search(query, count?) — Fast web search. Returns titles, URLs, and snippets. Use this FIRST for simple lookups like "John Smith LinkedIn", "username site:twitter.com", company info, news articles, etc. Much faster and cheaper than browser_action.`,
     `${n++}. geospy_predict(imageUrl) — AI photo geolocation. Upload a photo URL and get predicted GPS coordinates, city, country, and an explanation of the visual clues used. Use on any image that might reveal a location (street views, landmarks, scenery).`,
     `${n++}. geo_locate(imageUrl) — AI geolocation via Picarta: analyzes an image and predicts WHERE it was taken (city, state, country, GPS coordinates) based on visual clues. Returns coordinates, confidence score, EXIF metadata, and top-3 predictions. Use on any photo with visible backgrounds, landmarks, or architecture.`,
@@ -36,6 +36,7 @@ function buildSystemPrompt(maigretAvailable: boolean, extremeMode: boolean = fal
   }
   toolLines.push(
     `${n++}. save_finding(source, category, platform, data, confidence, imageUrl?, profileUrl?) — Save a confirmed finding. Categories: "social", "connection", "location", "activity", "identity". FREE — does not count toward your step budget. Save findings liberally as you discover them. IMPORTANT: When you find profile photos, post images, or any visual evidence, ALWAYS include the imageUrl. On imginn.com, image URLs look like "https://imginn.com/p/..." or CDN URLs from the page.`,
+    `${n++}. ask_user(question, options, context?) — Ask the user a clarifying question with 2-4 selectable options. Use when results are ambiguous and a quick answer would save multiple steps (e.g. "Found 12 John Smiths — which city are they likely in?"). Always include "Not sure" as the last option. FREE — doesn't burn steps.`,
     `${n++}. done(report) — End the investigation and generate the final report.`
   );
 
@@ -45,6 +46,8 @@ function buildSystemPrompt(maigretAvailable: boolean, extremeMode: boolean = fal
       ? [`  - Username known → start with maigret_search to cast a wide OSINT net`]
       : []),
     `  - Only a name → use web_search to find usernames, profiles, and leads first`,
+    `  - Common name + description → search "name" + key description details (city, job, age) on web_search FIRST to find leads; run maigret in parallel if a likely username emerges`,
+    `  - If results are overwhelming or ambiguous → use ask_user to let the user disambiguate (e.g. which city, which age range, which profile photo matches)`,
     `  - Photo available → use geospy_predict to geolocate the photo; use reverse_image_search to find where it appears online`,
     `  - Social links provided → explore those profiles directly (web_search or browser_action)`,
     `  - Phone number → search it via web_search${extremeMode ? "; also use whitepages_lookup for deep identity data" : ""}`,
@@ -58,6 +61,14 @@ function buildSystemPrompt(maigretAvailable: boolean, extremeMode: boolean = fal
     `  - General → cast a wide net across major platforms`,
     `- When you find photos with visible backgrounds (buildings, streets, landscapes), run geo_locate to predict GPS location`,
     `- Use web_search for simple lookups; reserve browser_action for pages that need interaction`,
+    `- Login wall avoidance — NEVER visit these sites directly in browser_action, use alternatives:`,
+    `  - Instagram → use imginn.com/username or picuki.com/profile/username (public viewer, no login)`,
+    `  - TikTok → use urlebird.com/user/username (public viewer, no login)`,
+    `  - Facebook → use web_search "site:facebook.com name" for cached data; or try mbasic.facebook.com/username for minimal public view`,
+    `  - LinkedIn → use web_search "site:linkedin.com/in/ name title" — Google caches public profiles; NEVER browse linkedin.com directly (login wall)`,
+    `  - Twitter/X → try nitter.net/username or xcancel.com/username as public viewers; fall back to web_search "site:x.com username"`,
+    `  - Pinterest → use web_search "site:pinterest.com username"; or browse pinterest.com/username/ (usually public without login)`,
+    `  - Reddit → use old.reddit.com/user/username (no login needed for public profiles)`,
     `- Save findings as you go (it's free — doesn't burn steps)`,
     `<use_parallel_tool_calls>\nFor maximum efficiency, whenever you perform multiple independent operations, invoke all relevant tools simultaneously rather than sequentially.\nPrioritize calling tools in parallel whenever possible.\n</use_parallel_tool_calls>`,
     `- After gathering enough evidence (or nearing 20 steps), call done()`,
@@ -210,6 +221,27 @@ const TOOL_DEFINITIONS = [
         confidence: { type: "number", description: "Confidence 0-100" },
       },
       required: ["source", "category", "data", "confidence"],
+    },
+  },
+  {
+    name: "ask_user",
+    description:
+      "Ask the user a clarifying question when you're stuck or results are ambiguous. Present 2-4 clear options. Use sparingly — only when disambiguation would save multiple wasted steps. Examples: 'Multiple John Smiths found — which city?', 'Is this the right person?' FREE — does not count toward step budget.",
+    input_schema: {
+      type: "object",
+      properties: {
+        question: { type: "string", description: "The question to ask" },
+        options: {
+          type: "array",
+          items: { type: "string" },
+          description: "2-4 answer options (always include 'Not sure' as last option)",
+        },
+        context: {
+          type: "string",
+          description: "Brief context for why you're asking",
+        },
+      },
+      required: ["question", "options"],
     },
   },
   {
@@ -386,6 +418,39 @@ export const step = internalAction({
     if (toolCalls.find((tc) => tc.tool === "done")) {
       await reasoningPromise;
       await generateReport(ctx, args.investigationId);
+      return;
+    }
+
+    // Handle ask_user — pause the loop and wait for user response
+    const askUserCall = toolCalls.find((tc) => tc.tool === "ask_user");
+    if (askUserCall) {
+      await reasoningPromise;
+      const askArgs = askUserCall.args as { question: string; options: string[]; context?: string };
+
+      const frozenHistory = [
+        ...conversationHistory,
+        { role: "assistant", content: data.content },
+      ];
+
+      await ctx.runMutation(api.investigations.createClarification, {
+        investigationId: args.investigationId,
+        question: askArgs.question,
+        options: askArgs.options,
+        context: askArgs.context,
+        conversationHistory: JSON.stringify(frozenHistory),
+        consecutiveSaveOnlySteps: args.consecutiveSaveOnlySteps ?? 0,
+        maigretAvailable: args.maigretAvailable ?? false,
+        extremeMode: args.extremeMode ?? false,
+      });
+
+      await ctx.runMutation(api.investigations.addStep, {
+        investigationId: args.investigationId,
+        stepNumber,
+        action: `Asking user: ${askArgs.question}`,
+        tool: "ask_user",
+      });
+
+      // DON'T schedule next step — wait for user response
       return;
     }
 
@@ -1255,3 +1320,41 @@ function calculateOverallConfidence(findings: { confidence: number }[]): number 
   const sum = findings.reduce((acc, f) => acc + f.confidence, 0);
   return Math.round(sum / findings.length);
 }
+
+export const resumeFromClarification = action({
+  args: { clarificationId: v.id("clarifications") },
+  handler: async (ctx, args) => {
+    const clar = await ctx.runQuery(api.investigations.getClarification, { id: args.clarificationId });
+    if (!clar || clar.status !== "answered") return;
+
+    const frozenHistory = JSON.parse(clar.conversationHistory);
+    const lastAssistant = frozenHistory[frozenHistory.length - 1];
+
+    const toolResultBlocks = lastAssistant.content
+      .filter((b: { type: string }) => b.type === "tool_use")
+      .map((b: { type: string; id: string; name: string }) => {
+        if (b.name === "ask_user") {
+          return { type: "tool_result", tool_use_id: b.id, content: `User answered: "${clar.response}"` };
+        }
+        return { type: "tool_result", tool_use_id: b.id, content: "Skipped — paused for user clarification" };
+      });
+
+    const resumedHistory = [
+      ...frozenHistory,
+      { role: "user", content: toolResultBlocks },
+    ];
+
+    await ctx.runMutation(api.investigations.updateStatus, {
+      id: clar.investigationId,
+      status: "investigating",
+    });
+
+    await ctx.scheduler.runAfter(0, internal.orchestrator.step, {
+      investigationId: clar.investigationId,
+      conversationHistory: JSON.stringify(resumedHistory),
+      consecutiveSaveOnlySteps: clar.consecutiveSaveOnlySteps,
+      maigretAvailable: clar.maigretAvailable,
+      extremeMode: clar.extremeMode,
+    });
+  },
+});

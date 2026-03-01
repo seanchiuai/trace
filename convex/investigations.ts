@@ -52,7 +52,8 @@ export const updateStatus = mutation({
       v.literal("analyzing"),
       v.literal("complete"),
       v.literal("failed"),
-      v.literal("stopped")
+      v.literal("stopped"),
+      v.literal("awaiting_input")
     ),
     errorMessage: v.optional(v.string()),
   },
@@ -234,5 +235,82 @@ export const updateBehavioralAnalysis = mutation({
 export const generateUploadUrl = mutation({
   handler: async (ctx) => {
     return await ctx.storage.generateUploadUrl();
+  },
+});
+
+// ── Clarification mutations/queries ──
+
+export const createClarification = mutation({
+  args: {
+    investigationId: v.id("investigations"),
+    question: v.string(),
+    options: v.array(v.string()),
+    context: v.optional(v.string()),
+    conversationHistory: v.string(),
+    consecutiveSaveOnlySteps: v.number(),
+    maigretAvailable: v.boolean(),
+    extremeMode: v.boolean(),
+  },
+  handler: async (ctx, args) => {
+    const id = await ctx.db.insert("clarifications", {
+      investigationId: args.investigationId,
+      question: args.question,
+      options: args.options,
+      context: args.context,
+      status: "pending",
+      conversationHistory: args.conversationHistory,
+      consecutiveSaveOnlySteps: args.consecutiveSaveOnlySteps,
+      maigretAvailable: args.maigretAvailable,
+      extremeMode: args.extremeMode,
+      createdAt: Date.now(),
+    });
+    await ctx.db.patch(args.investigationId, { status: "awaiting_input" });
+    return id;
+  },
+});
+
+export const respondToClarification = mutation({
+  args: {
+    id: v.id("clarifications"),
+    response: v.string(),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.id, {
+      response: args.response,
+      status: "answered",
+      respondedAt: Date.now(),
+    });
+  },
+});
+
+export const getPendingClarification = query({
+  args: { investigationId: v.id("investigations") },
+  handler: async (ctx, args) => {
+    const clarifications = await ctx.db
+      .query("clarifications")
+      .withIndex("by_investigation", (q) =>
+        q.eq("investigationId", args.investigationId)
+      )
+      .order("desc")
+      .collect();
+    return clarifications.find((c) => c.status === "pending") ?? null;
+  },
+});
+
+export const getClarification = query({
+  args: { id: v.id("clarifications") },
+  handler: async (ctx, args) => {
+    return await ctx.db.get(args.id);
+  },
+});
+
+export const skipClarification = mutation({
+  args: { id: v.id("clarifications") },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.id, {
+      status: "skipped",
+      response: "Not sure",
+      respondedAt: Date.now(),
+    });
   },
 });

@@ -68,6 +68,12 @@ export const TOOL_CONFIG: Record<
     bg: "bg-red-500/10",
     border: "border-red-500/20",
   },
+  ask_user: {
+    letter: "?",
+    color: "text-amber-400",
+    bg: "bg-amber-400/10",
+    border: "border-amber-400/20",
+  },
 };
 
 export function ToolBadge({ tool, size = "md" }: { tool: string; size?: "sm" | "md" }) {
