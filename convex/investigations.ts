@@ -78,11 +78,13 @@ export const updateReport = mutation({
     id: v.id("investigations"),
     report: v.string(),
     confidence: v.optional(v.number()),
+    profileReport: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     await ctx.db.patch(args.id, {
       report: args.report,
       confidence: args.confidence,
+      profileReport: args.profileReport,
     });
   },
 });

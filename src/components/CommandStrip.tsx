@@ -94,7 +94,7 @@ export default function CommandStrip({ steps, directives = [], isLive, progress,
             animate={{ height: "50vh" }}
             exit={{ height: 0 }}
             transition={{ type: "spring", damping: 30, stiffness: 300 }}
-            className="overflow-hidden bg-bg-primary/90 backdrop-blur-xl border-t border-white/[0.04]"
+            className="overflow-hidden bg-bg-primary/95 backdrop-blur-xl border-t border-white/[0.04]"
           >
             <div className="flex items-center justify-between px-4 py-2 border-b border-white/[0.04]">
               <div className="flex items-center gap-2">
@@ -194,7 +194,7 @@ export default function CommandStrip({ steps, directives = [], isLive, progress,
       </AnimatePresence>
 
       {/* Collapsed chyron bar */}
-      <div className="bg-bg-primary/80 backdrop-blur-xl px-4 py-2.5 flex items-center gap-3">
+      <div className="bg-bg-primary/95 backdrop-blur-xl px-4 py-2.5 flex items-center gap-3" style={{ willChange: "transform" }}>
         {currentStep ? (
           <>
             <ToolBadge tool={currentStep.tool} size="sm" />

@@ -264,20 +264,22 @@ body::before {
   font-family: var(--font-display);
 }
 
-/* Glassmorphic surface */
+/* Glassmorphic surface — uses solid-enough fallback so overlays stay visible over iframes */
 .glass {
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(10, 10, 15, 0.75);
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
   border: 1px solid rgba(255, 255, 255, 0.06);
+  will-change: transform;
 }
 
 /* Glassmorphic surface — accent tint */
 .glass-accent {
-  background: color-mix(in srgb, var(--color-accent) 8%, transparent);
+  background: rgba(10, 10, 15, 0.7);
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
-  border: 1px solid color-mix(in srgb, var(--color-accent) 24%, transparent);
+  border: 1px solid rgba(0, 255, 136, 0.1);
+  will-change: transform;
 }
 
 /* HUD corner brackets — add to a positioned container */

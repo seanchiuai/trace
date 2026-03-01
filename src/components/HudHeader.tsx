@@ -35,6 +35,7 @@ export default function HudHeader({
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, ease: "easeOut" }}
         className="fixed top-0 inset-x-0 z-20 h-14 flex items-center justify-between px-4 sm:px-6"
+        style={{ willChange: "transform" }}
       >
         {/* Left pill — Logo + target */}
         <a

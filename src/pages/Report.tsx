@@ -69,6 +69,7 @@ export default function Report() {
         completedAt={investigation.completedAt}
         estimatedCost={investigation.estimatedCost}
         behavioralAnalysis={investigation.behavioralAnalysis}
+        profileReport={investigation.profileReport}
       />
     </motion.div>
   );

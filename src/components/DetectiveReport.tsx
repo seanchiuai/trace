@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Link } from "react-router-dom";
 import BehavioralProfile from "./BehavioralProfile";
@@ -22,6 +22,22 @@ interface Step {
   createdAt?: number;
 }
 
+interface CandidateProfile {
+  label: string;
+  matchConfidence: number;
+  findingIndices: number[];
+  findingIds: string[];
+  keyEvidence: number[];
+  keyEvidenceIds: string[];
+  redFlags: string[];
+  summary: string;
+}
+
+interface ProfileReport {
+  profiles: CandidateProfile[];
+  unattributed: string[];
+}
+
 interface DetectiveReportProps {
   report: string;
   targetName: string;
@@ -32,6 +48,7 @@ interface DetectiveReportProps {
   completedAt?: number;
   estimatedCost?: number;
   behavioralAnalysis?: string;
+  profileReport?: string;
 }
 
 /* ─── Helpers ─── */
@@ -430,19 +447,65 @@ export default function DetectiveReport({
   completedAt,
   estimatedCost,
   behavioralAnalysis,
+  profileReport: profileReportJson,
 }: DetectiveReportProps) {
   const [activeCategory, setActiveCategory] = useState<string>("all");
   const [showFullReport, setShowFullReport] = useState(false);
   const [lightboxImage, setLightboxImage] = useState<Finding | null>(null);
+  const [activeProfileIdx, setActiveProfileIdx] = useState(0);
+
+  // Parse profile report JSON (graceful fallback if missing/invalid)
+  const profileReport = useMemo<ProfileReport | null>(() => {
+    if (!profileReportJson) return null;
+    try {
+      const parsed = JSON.parse(profileReportJson);
+      if (parsed.profiles && Array.isArray(parsed.profiles) && parsed.profiles.length > 0) {
+        return parsed as ProfileReport;
+      }
+    } catch { /* fall through */ }
+    return null;
+  }, [profileReportJson]);
+
+  const hasMultipleProfiles = profileReport !== null && profileReport.profiles.length > 1;
+  const activeProfile = profileReport?.profiles[activeProfileIdx] ?? null;
+
+  // Build finding lookup for profile view
+  const findingById = useMemo(() => {
+    const map = new Map<string, Finding>();
+    for (const f of findings) map.set(f._id, f);
+    return map;
+  }, [findings]);
+
+  // Get findings for the active profile tab (or all findings if no profile report)
+  const profileFindings = useMemo(() => {
+    if (!activeProfile) return findings;
+    return activeProfile.findingIds
+      .map((id: string) => findingById.get(id))
+      .filter((f): f is Finding => f !== undefined);
+  }, [activeProfile, findings, findingById]);
+
+  const unattributedFindings = useMemo(() => {
+    if (!profileReport) return [];
+    return profileReport.unattributed
+      .map((id: string) => findingById.get(id))
+      .filter((f): f is Finding => f !== undefined);
+  }, [profileReport, findingById]);
+
+  // Use profile-scoped findings for category counts when viewing a profile
+  const displayFindings = activeProfileIdx === -1
+    ? unattributedFindings
+    : activeProfile
+      ? profileFindings
+      : findings;
 
   const categories = ["all", "social", "connection", "location", "activity", "identity"];
   const filteredFindings =
     activeCategory === "all"
-      ? findings
-      : findings.filter((f) => f.category === activeCategory);
+      ? displayFindings
+      : displayFindings.filter((f) => f.category === activeCategory);
 
   const categoryCounts = categories.reduce<Record<string, number>>((acc, cat) => {
-    acc[cat] = cat === "all" ? findings.length : findings.filter((f) => f.category === cat).length;
+    acc[cat] = cat === "all" ? displayFindings.length : displayFindings.filter((f) => f.category === cat).length;
     return acc;
   }, {});
 
@@ -698,6 +761,136 @@ export default function DetectiveReport({
             </motion.div>
           ))}
         </div>
+
+        {/* ── Profile Tabs (multi-profile only) ── */}
+        {hasMultipleProfiles && profileReport && (
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.45 }}
+          >
+            <SectionHeader label="Candidate Profiles" count={profileReport.profiles.length} delay={0.45} />
+
+            {/* Tab bar */}
+            <div className="flex flex-wrap gap-2 mb-4">
+              {profileReport.profiles.map((profile, idx) => {
+                const isActive = activeProfileIdx === idx;
+                let confColor = "text-danger";
+                if (profile.matchConfidence >= 80) confColor = "text-accent";
+                else if (profile.matchConfidence >= 60) confColor = "text-warning";
+                else if (profile.matchConfidence >= 40) confColor = "text-orange-400";
+
+                return (
+                  <button
+                    key={idx}
+                    onClick={() => { setActiveProfileIdx(idx); setActiveCategory("all"); }}
+                    className={`relative flex items-center gap-2 px-4 py-2.5 rounded-lg text-[11px] font-mono transition-all cursor-pointer ${
+                      isActive
+                        ? "bg-accent/10 text-accent border border-accent/30"
+                        : "bg-bg-card/40 text-text-secondary hover:text-text-primary border border-border/40 hover:border-border-bright"
+                    }`}
+                  >
+                    {isActive && (
+                      <div className="absolute top-0 left-0 w-2.5 h-2.5 border-t border-l border-accent/40 rounded-tl-lg" />
+                    )}
+                    <span className="truncate max-w-[220px]">{profile.label}</span>
+                    <span className={`font-bold tabular-nums ${confColor}`}>
+                      {profile.matchConfidence}%
+                    </span>
+                  </button>
+                );
+              })}
+              {unattributedFindings.length > 0 && (
+                <button
+                  onClick={() => { setActiveProfileIdx(-1); setActiveCategory("all"); }}
+                  className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-[11px] font-mono transition-all cursor-pointer ${
+                    activeProfileIdx === -1
+                      ? "bg-text-muted/10 text-text-primary border border-text-muted/30"
+                      : "bg-bg-card/40 text-text-muted hover:text-text-secondary border border-border/40 hover:border-border-bright"
+                  }`}
+                >
+                  Unattributed
+                  <span className="tabular-nums text-text-muted/60">{unattributedFindings.length}</span>
+                </button>
+              )}
+            </div>
+
+            {/* Active profile card */}
+            <AnimatePresence mode="wait">
+              {activeProfile && (
+                <motion.div
+                  key={activeProfileIdx}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8 }}
+                  transition={{ duration: 0.25 }}
+                  className="bg-bg-card/30 border border-border/40 rounded-xl p-5 space-y-3"
+                >
+                  {/* Summary */}
+                  {activeProfile.summary && (
+                    <p className="text-[13px] text-text-secondary leading-relaxed font-mono">
+                      {activeProfile.summary}
+                    </p>
+                  )}
+
+                  {/* Key evidence highlights */}
+                  {activeProfile.keyEvidenceIds.length > 0 && (
+                    <div>
+                      <span className="text-[9px] text-accent/60 tracking-[0.2em] uppercase font-mono font-bold">
+                        Key Evidence
+                      </span>
+                      <div className="mt-1.5 space-y-1">
+                        {activeProfile.keyEvidenceIds.map((id: string) => {
+                          const f = findingById.get(id);
+                          if (!f) return null;
+                          return (
+                            <div key={id} className="flex items-start gap-2 text-[11px]">
+                              <div className="w-1.5 h-1.5 rounded-full bg-accent/60 mt-1.5 shrink-0" />
+                              <span className="text-text-primary/80">{f.data}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Red flags */}
+                  {activeProfile.redFlags.length > 0 && (
+                    <div>
+                      <span className="text-[9px] text-danger/60 tracking-[0.2em] uppercase font-mono font-bold">
+                        Red Flags
+                      </span>
+                      <div className="mt-1.5 space-y-1">
+                        {activeProfile.redFlags.map((flag: string, i: number) => (
+                          <div key={i} className="flex items-start gap-2 text-[11px]">
+                            <div className="w-1.5 h-1.5 rounded-full bg-danger/60 mt-1.5 shrink-0" />
+                            <span className="text-danger/80">{flag}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </motion.div>
+              )}
+
+              {/* Unattributed view */}
+              {activeProfileIdx === -1 && (
+                <motion.div
+                  key="unattributed"
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8 }}
+                  transition={{ duration: 0.25 }}
+                  className="bg-bg-card/30 border border-border/40 rounded-xl p-5"
+                >
+                  <p className="text-[12px] text-text-muted font-mono">
+                    These findings could not be confidently attributed to any candidate profile.
+                  </p>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </motion.div>
+        )}
 
         {/* ── Executive Summary / Full Report ── */}
         <motion.div
