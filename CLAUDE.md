@@ -27,8 +27,7 @@ cd sidecar && pip install -r requirements.txt && python server.py
 - **Anthropic API** (Claude Sonnet for agentic loop, Opus for reports) — Orchestrator LLM
 - **Browser Use API** — Cloud browser automation
 - **Maigret** — Username OSINT (Python sidecar via FastAPI)
-- **GeoSpy AI** — Photo geolocation (visual clue analysis)
-- **Picarta AI** — Photo geolocation (alternative engine, EXIF extraction)
+- **Picarta AI** — Photo geolocation (EXIF extraction)
 - **SerpAPI** — Reverse image search (Google Lens)
 - **WhitePages** — Person lookup by name/phone (extreme mode)
 - **IntelX** — Dark web / breach search (extreme mode)
@@ -73,7 +72,6 @@ convex/
     ├── browserUse.ts        # Browser Use Cloud API v3
     ├── maigret.ts           # Username OSINT (calls Python sidecar)
     ├── picarta.ts           # Picarta AI photo geolocation
-    ├── geoSpy.ts            # GeoSpy AI photo geolocation
     ├── reverseImageSearch.ts # Google Lens via SerpAPI
     ├── whitePages.ts        # Person lookup (extreme mode)
     └── intelx.ts            # Dark web / breach search (extreme mode)
@@ -92,7 +90,6 @@ Convex dashboard (Settings → Environment Variables):
 - `BROWSER_USE_API_KEY` — Browser Use Cloud API key (required)
 - `BRAVE_API_KEY` — Brave Search API key (required)
 - `PICARTA_API_KEY` — Picarta AI geolocation (free tier: 100 calls/month)
-- `GEOSPY_API_KEY` — GeoSpy AI geolocation
 - `SERPAPI_API_KEY` — SerpAPI for reverse image search (Google Lens)
 - `WHITEPAGES_API_KEY` — WhitePages person lookup (extreme mode only)
 - `INTELX_API_KEY` — IntelX dark web search (extreme mode only)

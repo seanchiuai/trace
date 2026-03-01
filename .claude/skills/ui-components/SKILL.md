@@ -214,7 +214,6 @@ Single-letter abbreviations with tool-specific colors (includes `bg` and `border
 | browser_action | B | `text-cyan-400` |
 | web_search | W | `text-orange-400` |
 | save_finding | S | `text-yellow-400` |
-| geospy | G | `text-green-400` |
 | whitepages | P | `text-red-400` |
 | reverse_image | I | `text-pink-400` |
 | darkweb | D | `text-red-500` |
