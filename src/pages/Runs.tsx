@@ -3,6 +3,15 @@ import { Link } from "react-router-dom";
 import { api } from "../../convex/_generated/api";
 import { motion } from "framer-motion";
 
+const MAX_STEPS = 20;
+
+function confidenceColor(confidence: number, prefix: "bg" | "text"): string {
+  if (confidence >= 80) return `${prefix}-accent`;
+  if (confidence >= 60) return `${prefix}-yellow-400`;
+  if (confidence >= 40) return `${prefix}-orange-400`;
+  return `${prefix}-danger`;
+}
+
 const STATUS_STYLES: Record<string, { label: string; dot: string; text: string; bg: string; border: string }> = {
   planning:      { label: "Planning",      dot: "bg-blue-400",   text: "text-blue-400",   bg: "bg-blue-400/8",   border: "border-blue-400/20" },
   investigating: { label: "Investigating", dot: "bg-amber-400",  text: "text-amber-400",  bg: "bg-amber-400/8",  border: "border-amber-400/20" },
@@ -186,7 +195,7 @@ export default function Runs() {
                       <div className="flex items-center gap-3 text-[10px] text-text-muted/50 font-mono">
                         <span className="tabular-nums">{timeAgo(inv.createdAt)}</span>
                         <div className="h-2.5 w-px bg-border/30" />
-                        <span className="tabular-nums">{inv.stepCount}/{20} steps</span>
+                        <span className="tabular-nums">{inv.stepCount}/{MAX_STEPS} steps</span>
                         {inv.estimatedCost != null && (
                           <>
                             <div className="h-2.5 w-px bg-border/30" />
@@ -200,15 +209,11 @@ export default function Runs() {
                         <div className="flex items-center gap-2 mt-3 pt-3 border-t border-border/20">
                           <div className="flex-1 h-1 bg-white/[0.04] rounded-full overflow-hidden">
                             <div
-                              className={`h-full rounded-full ${
-                                inv.confidence >= 80 ? "bg-accent" : inv.confidence >= 60 ? "bg-yellow-400" : inv.confidence >= 40 ? "bg-orange-400" : "bg-danger"
-                              }`}
+                              className={`h-full rounded-full ${confidenceColor(inv.confidence, "bg")}`}
                               style={{ width: `${inv.confidence}%` }}
                             />
                           </div>
-                          <span className={`text-[10px] font-bold font-mono tabular-nums ${
-                            inv.confidence >= 80 ? "text-accent" : inv.confidence >= 60 ? "text-yellow-400" : inv.confidence >= 40 ? "text-orange-400" : "text-danger"
-                          }`}>
+                          <span className={`text-[10px] font-bold font-mono tabular-nums ${confidenceColor(inv.confidence, "text")}`}>
                             {inv.confidence}%
                           </span>
                         </div>
