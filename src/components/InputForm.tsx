@@ -8,6 +8,7 @@ interface InputFormProps {
     targetPhone?: string;
     targetPhoto?: string;
     knownLinks: string[];
+    instructions?: string;
     extremeMode: boolean;
   }) => void;
   loading: boolean;
@@ -47,6 +48,7 @@ export default function InputForm({ onSubmit, loading }: InputFormProps) {
   const [description, setDescription] = useState("");
   const [phone, setPhone] = useState("");
   const [links, setLinks] = useState("");
+  const [instructions, setInstructions] = useState("");
   const [focused, setFocused] = useState<string | null>(null);
   const [extremeMode, setExtremeMode] = useState(false);
 
@@ -64,6 +66,7 @@ export default function InputForm({ onSubmit, loading }: InputFormProps) {
       targetDescription: description.trim() || undefined,
       targetPhone: phone.trim() || undefined,
       knownLinks,
+      instructions: instructions.trim() || undefined,
       extremeMode,
     });
   };
@@ -140,8 +143,24 @@ export default function InputForm({ onSubmit, loading }: InputFormProps) {
             </p>
           </FormField>
 
+          {/* Investigation Instructions */}
+          <FormField label="Instructions" delay={0.3}>
+            <textarea
+              value={instructions}
+              onChange={(e) => setInstructions(e.target.value)}
+              onFocus={() => setFocused("instructions")}
+              onBlur={() => setFocused(null)}
+              placeholder={"Find their current address\nLocate contact email or phone\nFocus on their professional background"}
+              rows={3}
+              className={`${inputBase} resize-none ${focused === "instructions" ? inputFocus : inputIdle}`}
+            />
+            <p className="text-[10px] text-text-muted mt-1.5 tracking-wide">
+              Tell the investigator what to focus on
+            </p>
+          </FormField>
+
           {/* Photo upload placeholder */}
-          <FormField label="Photo" delay={0.3}>
+          <FormField label="Photo" delay={0.35}>
             <div className="relative w-full px-4 py-8 bg-bg-card/50 border border-dashed border-border rounded-lg text-center cursor-pointer hover:border-accent/30 hover:bg-bg-card/80 transition-all duration-300 group">
               <div className="w-10 h-10 mx-auto mb-3 rounded-lg bg-bg-primary border border-border flex items-center justify-center group-hover:border-accent/20 transition-colors">
                 <svg
@@ -172,7 +191,7 @@ export default function InputForm({ onSubmit, loading }: InputFormProps) {
         <motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, delay: 0.35 }}
+          transition={{ duration: 0.4, delay: 0.4 }}
           className="mt-6"
         >
           <button
@@ -225,7 +244,7 @@ export default function InputForm({ onSubmit, loading }: InputFormProps) {
         <motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, delay: 0.4 }}
+          transition={{ duration: 0.4, delay: 0.45 }}
           className="mt-4"
         >
           <button

@@ -15,12 +15,14 @@ export default defineSchema({
       v.literal("analyzing"),
       v.literal("complete"),
       v.literal("failed"),
-      v.literal("stopped")
+      v.literal("stopped"),
+      v.literal("awaiting_input")
     ),
     browserSessionId: v.optional(v.string()),
     browserLiveUrl: v.optional(v.string()),
     report: v.optional(v.string()),
     confidence: v.optional(v.number()),
+    instructions: v.optional(v.string()),
     extremeMode: v.optional(v.boolean()),
     errorMessage: v.optional(v.string()),
     stepCount: v.number(),
@@ -53,6 +55,31 @@ export default defineSchema({
     tool: v.string(),
     result: v.optional(v.string()),
     screenshot: v.optional(v.string()),
+    createdAt: v.number(),
+  }).index("by_investigation", ["investigationId"]),
+
+  directives: defineTable({
+    investigationId: v.id("investigations"),
+    type: v.union(v.literal("kill_lead"), v.literal("general")),
+    findingId: v.optional(v.id("findings")),
+    message: v.string(),
+    acknowledged: v.boolean(),
+    createdAt: v.number(),
+  }).index("by_investigation", ["investigationId"])
+    .index("by_investigation_pending", ["investigationId", "acknowledged"]),
+
+  clarifications: defineTable({
+    investigationId: v.id("investigations"),
+    question: v.string(),
+    options: v.array(v.string()),
+    context: v.optional(v.string()),
+    response: v.optional(v.string()),
+    respondedAt: v.optional(v.number()),
+    status: v.union(v.literal("pending"), v.literal("answered"), v.literal("skipped")),
+    conversationHistory: v.string(),
+    consecutiveSaveOnlySteps: v.number(),
+    maigretAvailable: v.boolean(),
+    extremeMode: v.boolean(),
     createdAt: v.number(),
   }).index("by_investigation", ["investigationId"]),
 
