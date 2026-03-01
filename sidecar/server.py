@@ -9,8 +9,6 @@ import logging
 import shutil
 import tempfile
 from pathlib import Path
-from typing import Optional
-
 from fastapi import FastAPI, Query, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -324,6 +322,8 @@ async def batch_search(
             batch_results[uname] = result
 
     return {"usernames": username_list, "results": batch_results}
+
+
 
 
 @app.get("/health")
