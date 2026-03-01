@@ -241,6 +241,42 @@ body::before {
 }
 
 /* ═══════════════════════════════════════
+   KEYFRAME ANIMATIONS (Tool Overlays)
+   ═══════════════════════════════════════ */
+
+/* Screen shake for darkweb glitch overlay */
+@keyframes screenShake {
+  0%, 100% { transform: translate(0, 0); }
+  10% { transform: translate(-2px, 1px); }
+  20% { transform: translate(2px, -1px); }
+  30% { transform: translate(-1px, 2px); }
+  40% { transform: translate(1px, -2px); }
+  50% { transform: translate(-2px, 0px); }
+  60% { transform: translate(2px, 1px); }
+  70% { transform: translate(0px, -1px); }
+  80% { transform: translate(-1px, 1px); }
+  90% { transform: translate(1px, 0px); }
+}
+
+.screen-shake {
+  animation: screenShake 0.3s ease-in-out infinite;
+}
+
+/* Username scroll for identity scan overlay */
+@keyframes usernameScroll {
+  0% { transform: translateY(-100%); opacity: 0; }
+  10% { opacity: 0.8; }
+  90% { opacity: 0.8; }
+  100% { transform: translateY(100vh); opacity: 0; }
+}
+
+/* Scan beam for pixel analysis overlay */
+@keyframes scanBeam {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100vw); }
+}
+
+/* ═══════════════════════════════════════
    UTILITY CLASSES
    ═══════════════════════════════════════ */
 

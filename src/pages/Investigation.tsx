@@ -16,6 +16,8 @@ import GeoIntelMap from "../components/GeoIntelMap";
 import ClarificationCard from "../components/ClarificationCard";
 import SteeringInput from "../components/SteeringInput";
 import { useGraphData } from "../hooks/useGraphData";
+import ToolAnimationOverlay from "../components/overlays/ToolAnimationOverlay";
+import { useActiveTool } from "../components/overlays/useActiveTool";
 
 const STATUS_CONFIG: Record<
   string,
@@ -183,6 +185,8 @@ export default function Investigation() {
   const hasConnections = (edges?.length ?? 0) > 0 || (findings?.some(f => f.category === "connection") ?? false);
   const hasLocations = findings?.some(f => f.category === "location") ?? false;
 
+  const { tool: activeTool, stepId: activeStepId } = useActiveTool(steps || [], isLive);
+
   return (
     <div className="h-screen w-screen bg-bg-primary overflow-hidden relative">
       {/* Layer 0: Ambient background */}
@@ -203,6 +207,9 @@ export default function Investigation() {
           }}
         />
       </div>
+
+      {/* Layer 0.5: Tool animation overlays */}
+      <ToolAnimationOverlay activeTool={activeTool} stepId={activeStepId} />
 
       {/* Layer 1: Main content view */}
       <motion.div
