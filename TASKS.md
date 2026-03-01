@@ -6,7 +6,7 @@
 |-------|-------------|--------|
 | 1 | Scaffold Vite + Convex + schema | Complete |
 | 2 | Maigret sidecar (FastAPI + wrapper) | Complete (code written, needs testing) |
-| 3 | Browser Use integration | Pending |
+| 3 | Browser Use integration | Complete (code written, needs API key testing) |
 | 4 | Opus orchestrator loop | Pending |
 | 5 | FaceCheck API integration | Pending |
 | 6 | Frontend: input form + live browser + activity stream | Pending |
@@ -22,7 +22,8 @@
 - [x] Define Convex schema (investigations, findings, steps tables with indexes)
 - [x] Create investigation CRUD mutations and queries
 - [x] Create orchestrator with Opus tool loop and report generation
-- [x] Create Browser Use tool actions (create session, run task, get status)
+- [x] Create Browser Use tool actions (create session, run task, get status, get session, stop session)
+- [x] Fix Browser Use API v2 integration (endpoints, auth, polling, session lifecycle)
 - [x] Create FaceCheck tool action (upload, poll, parse results)
 - [x] Create Maigret tool action (calls local sidecar)
 - [x] Create reports query (assembles investigation + findings + steps)
@@ -47,10 +48,15 @@
 - [ ] Test timeout handling and error responses
 
 ### Phase 3: Browser Use Integration
+- [x] Fix API v2 endpoints, auth header, and endpoint paths in browserUse.ts
+- [x] Add task polling loop (POST /tasks → poll GET /tasks/{id} until finished/failed)
+- [x] Add getSession and stopSession actions
+- [x] Add eager session creation in orchestrator startInvestigation
+- [x] Wire session cleanup into all orchestrator exit paths
+- [x] Relax iframe sandbox (allow-forms, allow-popups) for live view
 - [ ] Set BROWSER_USE_API_KEY in Convex environment
-- [ ] Test session creation and task execution
-- [ ] Verify live URL works in iframe (CORS/sandbox)
-- [ ] Handle session cleanup on investigation complete/fail
+- [ ] Test session creation and task execution end-to-end
+- [ ] Verify live URL works in iframe
 
 ### Phase 4: Opus Orchestrator Testing
 - [ ] Set ANTHROPIC_API_KEY in Convex environment
@@ -74,17 +80,16 @@
 - [ ] Verify Browser Use iframe loads live URL
 - [ ] Test activity stream auto-scroll and animation
 
-
-### Phase 8: Laminar (cut candidate)
+### Phase 7: Laminar (cut candidate)
 - [ ] Evaluate if Laminar adds enough value for demo
 - [ ] If keeping: add observability tree view component
 
-### Phase 9: Detective Report
+### Phase 8: Detective Report
 - [ ] Render report as formatted markdown (not raw pre)
 - [ ] Add export-to-PDF functionality
 - [ ] Style report page with detective board aesthetic
 
-### Phase 10: Polish
+### Phase 9: Polish
 - [ ] Verify no default Vite styles leaking
 - [ ] Test all animations in browser (FaceScan sequence, activity stream)
 - [ ] Add loading states for all async operations

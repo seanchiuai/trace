@@ -51,11 +51,15 @@ export const updateStatus = mutation({
       v.literal("complete"),
       v.literal("failed")
     ),
+    errorMessage: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const patch: Record<string, unknown> = { status: args.status };
     if (args.status === "complete") {
       patch.completedAt = Date.now();
+    }
+    if (args.status === "failed" && args.errorMessage) {
+      patch.errorMessage = args.errorMessage;
     }
     await ctx.db.patch(args.id, patch);
   },
@@ -159,6 +163,27 @@ export const addFinding = mutation({
     return await ctx.db.insert("findings", {
       ...args,
       createdAt: Date.now(),
+    });
+  },
+});
+
+export const updateTokenUsage = mutation({
+  args: {
+    id: v.id("investigations"),
+    inputTokens: v.number(),
+    outputTokens: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const investigation = await ctx.db.get(args.id);
+    if (!investigation) return;
+    const totalInput = (investigation.totalInputTokens ?? 0) + args.inputTokens;
+    const totalOutput = (investigation.totalOutputTokens ?? 0) + args.outputTokens;
+    // Opus pricing: $15/M input, $75/M output
+    const cost = (totalInput / 1_000_000) * 15 + (totalOutput / 1_000_000) * 75;
+    await ctx.db.patch(args.id, {
+      totalInputTokens: totalInput,
+      totalOutputTokens: totalOutput,
+      estimatedCost: Math.round(cost * 10000) / 10000,
     });
   },
 });

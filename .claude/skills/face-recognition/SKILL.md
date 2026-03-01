@@ -15,16 +15,23 @@ Located in `convex/tools/faceCheck.ts`.
 
 ### API Flow
 
-1. **Upload**: POST image (URL or base64) to `/upload_pic` → get `id_search`
-2. **Poll**: POST to `/search` with `id_search` every 2s until `output` exists
+1. **Upload**: POST image (URL or base64) to `/api/upload_pic` → get `id_search`
+2. **Poll**: POST to `/api/search` with `id_search` every 2s until `output` exists (max 30 attempts)
 3. **Parse**: Extract matches with `score`, `url`, `thumbnailUrl`, platform detection
 
 ```typescript
 // Step 1: Upload
+const searchBody: Record<string, unknown> = { id_search: "" };
+if (args.imageUrl) {
+  searchBody.images = [args.imageUrl];
+} else if (args.imageBase64) {
+  searchBody.images_base64 = [args.imageBase64];
+}
+
 const searchRes = await fetch(`${FACECHECK_API}/upload_pic`, {
   method: "POST",
   headers: { Authorization: apiKey, "Content-Type": "application/json" },
-  body: JSON.stringify({ id_search: "", images: [imageUrl] }),
+  body: JSON.stringify(searchBody),
 });
 const { id_search } = await searchRes.json();
 
@@ -33,6 +40,20 @@ const resultRes = await fetch(`${FACECHECK_API}/search`, {
   method: "POST",
   headers: { Authorization: apiKey, "Content-Type": "application/json" },
   body: JSON.stringify({ id_search: searchId, with_progress: true }),
+});
+```
+
+**Note**: The official FaceCheck.id API docs specify multipart form-data for `upload_pic`, but the current implementation sends JSON. This works but may differ from the official spec.
+
+### Function Signature
+
+```typescript
+export const searchByImage = internalAction({
+  args: {
+    imageUrl: v.optional(v.string()),     // URL of image to search
+    imageBase64: v.optional(v.string()),   // OR base64-encoded image
+  },
+  // At least one of imageUrl or imageBase64 is required
 });
 ```
 
@@ -58,7 +79,7 @@ The `extractPlatform()` helper maps URLs to platform names:
     {
       score: 94.2,
       url: "https://instagram.com/janedoe456",
-      thumbnailUrl: "https://...",
+      thumbnailUrl: "https://...",   // item.image_url || item.base64
       platform: "Instagram",
     }
   ]
@@ -125,7 +146,7 @@ interface FaceScanProps {
 
 | File | What |
 |------|------|
-| `convex/tools/faceCheck.ts` | `searchByImage` internalAction, `extractPlatform` helper |
+| `convex/tools/faceCheck.ts` | `searchByImage` internalAction (accepts `imageUrl` or `imageBase64`), `extractPlatform` helper |
 | `src/components/FaceScan.tsx` | Full overlay component with all animation phases |
 | `src/pages/Investigation.tsx` | Trigger logic (watches steps for face_check results) |
 | `src/index.css` | CSS keyframe definitions |

@@ -1,20 +1,27 @@
 import { v } from "convex/values";
 import { internalAction } from "../_generated/server";
 
-const BROWSER_USE_API = "https://api.browser-use.com/api/v1";
+const BROWSER_USE_API = "https://api.browser-use.com/api/v2";
+
+function getApiKey(): string {
+  const apiKey = process.env.BROWSER_USE_API_KEY;
+  if (!apiKey) throw new Error("BROWSER_USE_API_KEY not set");
+  return apiKey;
+}
+
+function getHeaders(): Record<string, string> {
+  return {
+    "X-Browser-Use-API-Key": getApiKey(),
+    "Content-Type": "application/json",
+  };
+}
 
 export const createSession = internalAction({
   args: {},
   handler: async () => {
-    const apiKey = process.env.BROWSER_USE_API_KEY;
-    if (!apiKey) throw new Error("BROWSER_USE_API_KEY not set");
-
     const res = await fetch(`${BROWSER_USE_API}/sessions`, {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
+      headers: getHeaders(),
       body: JSON.stringify({}),
     });
 
@@ -29,43 +36,83 @@ export const runTask = internalAction({
     sessionId: v.optional(v.string()),
   },
   handler: async (_, args) => {
-    const apiKey = process.env.BROWSER_USE_API_KEY;
-    if (!apiKey) throw new Error("BROWSER_USE_API_KEY not set");
-
-    const body: Record<string, unknown> = {
-      task: args.task,
-    };
+    const body: Record<string, unknown> = { task: args.task };
     if (args.sessionId) {
       body.session_id = args.sessionId;
     }
 
-    const res = await fetch(`${BROWSER_USE_API}/run-task`, {
+    // Create the task
+    const createRes = await fetch(`${BROWSER_USE_API}/tasks`, {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
+      headers: getHeaders(),
       body: JSON.stringify(body),
     });
 
-    if (!res.ok) throw new Error(`Browser Use task failed: ${res.status}`);
-    return await res.json();
+    if (!createRes.ok) throw new Error(`Browser Use task creation failed: ${createRes.status}`);
+    const created = await createRes.json();
+    const taskId = created.id;
+
+    // Poll until finished/failed (max 120 attempts × 2s = 4 min)
+    const maxAttempts = 120;
+    for (let i = 0; i < maxAttempts; i++) {
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+
+      const pollRes = await fetch(`${BROWSER_USE_API}/tasks/${taskId}`, {
+        headers: { "X-Browser-Use-API-Key": getApiKey() },
+      });
+
+      if (!pollRes.ok) throw new Error(`Browser Use poll failed: ${pollRes.status}`);
+      const task = await pollRes.json();
+
+      if (task.status === "finished") {
+        return task;
+      }
+      if (task.status === "failed") {
+        throw new Error(`Browser Use task failed: ${task.error || "unknown error"}`);
+      }
+    }
+
+    throw new Error("Browser Use task timed out after 4 minutes");
   },
 });
 
 export const getTaskStatus = internalAction({
   args: { taskId: v.string() },
   handler: async (_, args) => {
-    const apiKey = process.env.BROWSER_USE_API_KEY;
-    if (!apiKey) throw new Error("BROWSER_USE_API_KEY not set");
-
-    const res = await fetch(`${BROWSER_USE_API}/task/${args.taskId}`, {
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-      },
+    const res = await fetch(`${BROWSER_USE_API}/tasks/${args.taskId}`, {
+      headers: { "X-Browser-Use-API-Key": getApiKey() },
     });
 
     if (!res.ok) throw new Error(`Browser Use status check failed: ${res.status}`);
     return await res.json();
+  },
+});
+
+export const getSession = internalAction({
+  args: { sessionId: v.string() },
+  handler: async (_, args) => {
+    const res = await fetch(`${BROWSER_USE_API}/sessions/${args.sessionId}`, {
+      headers: { "X-Browser-Use-API-Key": getApiKey() },
+    });
+
+    if (!res.ok) throw new Error(`Browser Use session fetch failed: ${res.status}`);
+    return await res.json();
+  },
+});
+
+export const stopSession = internalAction({
+  args: { sessionId: v.string() },
+  handler: async (_, args) => {
+    const res = await fetch(`${BROWSER_USE_API}/sessions/${args.sessionId}`, {
+      method: "PATCH",
+      headers: getHeaders(),
+      body: JSON.stringify({ action: "stop" }),
+    });
+
+    // 404 is fine — session may already be gone
+    if (!res.ok && res.status !== 404) {
+      throw new Error(`Browser Use session stop failed: ${res.status}`);
+    }
+    return { stopped: true };
   },
 });

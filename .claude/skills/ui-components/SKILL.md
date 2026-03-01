@@ -30,12 +30,15 @@ Defined in `src/index.css`:
 | `bg-primary` | `#0a0a0f` | Page background |
 | `bg-secondary` | `#12121a` | Section backgrounds |
 | `bg-card` | `#1a1a2e` | Cards, inputs, containers |
+| `bg-card-hover` | `#1f1f35` | Card hover state |
 | `border` | `#2a2a3e` | Default borders |
 | `border-bright` | `#3a3a5e` | Hover/active borders |
 | `accent` | `#00ff88` | CTA buttons, active indicators, highlights |
 | `accent-dim` | `#00cc6a` | Accent hover state |
+| `accent-glow` | `rgba(0, 255, 136, 0.3)` | Glow effects |
 | `danger` | `#ff4444` | Errors, low confidence (<40%) |
 | `warning` | `#ffaa00` | Medium confidence (40-79%) |
+| `info` | `#4488ff` | Planning status |
 | `text-primary` | `#e8e8f0` | Main body text |
 | `text-secondary` | `#8888aa` | Labels, secondary info |
 | `text-muted` | `#555577` | Placeholders, hints |
@@ -144,6 +147,14 @@ Single-letter abbreviations with tool-specific colors:
 | face_check | F | `text-green-400` |
 | save_finding | S | `text-yellow-400` |
 
+### BrowserView States
+
+| State | Condition | Display |
+|-------|-----------|---------|
+| Planning | `status === "planning"`, no URL | Globe icon + "Waiting for investigation to start..." |
+| Connecting | `status === "investigating"`, no URL | Green pulse + "Connecting to browser..." |
+| Active | `liveUrl` present | URL bar (green dot + "LIVE" badge) + full-height iframe |
+
 ## CSS Animations
 
 Defined in `src/index.css`, used primarily by FaceScan:
@@ -154,7 +165,7 @@ Defined in `src/index.css`, used primarily by FaceScan:
 | `bracketSnap` | Scale 1.5→0.95→1 with opacity | One-shot |
 | `matchReveal` | Slide in from right 100px | One-shot |
 | `confidenceGlow` | Pulsing green box-shadow | 2s infinite |
-| `pulse` | Opacity 1→0.5→1 | Built-in Tailwind |
+| `pulse` | Opacity 1→0.5→1 | Custom keyframe in index.css |
 
 ## Convex Integration
 

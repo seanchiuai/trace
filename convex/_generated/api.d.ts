@@ -14,7 +14,6 @@ import type * as reports from "../reports.js";
 import type * as tools_browserUse from "../tools/browserUse.js";
 import type * as tools_faceCheck from "../tools/faceCheck.js";
 import type * as tools_maigret from "../tools/maigret.js";
-import type * as tools_supermemory from "../tools/supermemory.js";
 
 import type {
   ApiFromModules,
@@ -29,7 +28,6 @@ declare const fullApi: ApiFromModules<{
   "tools/browserUse": typeof tools_browserUse;
   "tools/faceCheck": typeof tools_faceCheck;
   "tools/maigret": typeof tools_maigret;
-  "tools/supermemory": typeof tools_supermemory;
 }>;
 
 /**

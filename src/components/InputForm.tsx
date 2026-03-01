@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { motion } from "framer-motion";
 
 interface InputFormProps {
   onSubmit: (data: {
@@ -11,11 +12,41 @@ interface InputFormProps {
   loading: boolean;
 }
 
+function FormField({
+  label,
+  required,
+  children,
+  delay = 0,
+}: {
+  label: string;
+  required?: boolean;
+  children: React.ReactNode;
+  delay?: number;
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4, delay }}
+    >
+      <label className="flex items-center gap-2 mb-2">
+        <div className="h-px w-3 bg-accent/30" />
+        <span className="text-[10px] text-text-secondary tracking-[0.2em] uppercase font-mono">
+          {label}
+          {required && <span className="text-accent ml-1">*</span>}
+        </span>
+      </label>
+      {children}
+    </motion.div>
+  );
+}
+
 export default function InputForm({ onSubmit, loading }: InputFormProps) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [phone, setPhone] = useState("");
   const [links, setLinks] = useState("");
+  const [focused, setFocused] = useState<string | null>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,99 +65,139 @@ export default function InputForm({ onSubmit, loading }: InputFormProps) {
     });
   };
 
+  const inputBase =
+    "w-full px-4 py-3 bg-bg-card/80 border rounded-lg text-text-primary text-sm placeholder:text-text-muted/60 focus:outline-none transition-all duration-300";
+  const inputIdle = "border-border hover:border-border-bright";
+  const inputFocus = "border-accent/40 shadow-[0_0_20px_rgba(0,255,136,0.06)]";
+
   return (
-    <form
-      onSubmit={handleSubmit}
-      className="w-full max-w-lg space-y-4"
-    >
-      {/* Name */}
-      <div>
-        <label className="block text-xs text-text-secondary mb-1.5 uppercase tracking-wider">
-          Target Name *
-        </label>
-        <input
-          type="text"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="John Doe"
-          required
-          className="w-full px-4 py-3 bg-bg-card border border-border rounded-lg text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent transition-colors"
-        />
-      </div>
+    <form onSubmit={handleSubmit} className="w-full max-w-lg">
+      {/* Form container with HUD corners */}
+      <div className="relative p-6 rounded-xl border border-border/60 bg-bg-secondary/40 backdrop-blur-sm">
+        {/* HUD corner brackets */}
+        <div className="absolute top-0 left-0 w-5 h-5 border-t-2 border-l-2 border-accent/30 rounded-tl-xl" />
+        <div className="absolute top-0 right-0 w-5 h-5 border-t-2 border-r-2 border-accent/30 rounded-tr-xl" />
+        <div className="absolute bottom-0 left-0 w-5 h-5 border-b-2 border-l-2 border-accent/30 rounded-bl-xl" />
+        <div className="absolute bottom-0 right-0 w-5 h-5 border-b-2 border-r-2 border-accent/30 rounded-br-xl" />
 
-      {/* Description */}
-      <div>
-        <label className="block text-xs text-text-secondary mb-1.5 uppercase tracking-wider">
-          Description
-        </label>
-        <textarea
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          placeholder="25 years old, last seen in San Francisco, brown hair, works in tech..."
-          rows={3}
-          className="w-full px-4 py-3 bg-bg-card border border-border rounded-lg text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent transition-colors resize-none"
-        />
-      </div>
+        <div className="space-y-5">
+          {/* Name */}
+          <FormField label="Target Name" required delay={0.1}>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              onFocus={() => setFocused("name")}
+              onBlur={() => setFocused(null)}
+              placeholder="John Doe"
+              required
+              className={`${inputBase} ${focused === "name" ? inputFocus : inputIdle}`}
+            />
+          </FormField>
 
-      {/* Phone */}
-      <div>
-        <label className="block text-xs text-text-secondary mb-1.5 uppercase tracking-wider">
-          Phone Number
-        </label>
-        <input
-          type="tel"
-          value={phone}
-          onChange={(e) => setPhone(e.target.value)}
-          placeholder="+1 (555) 123-4567"
-          className="w-full px-4 py-3 bg-bg-card border border-border rounded-lg text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent transition-colors"
-        />
-      </div>
+          {/* Description */}
+          <FormField label="Description" delay={0.15}>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              onFocus={() => setFocused("desc")}
+              onBlur={() => setFocused(null)}
+              placeholder="25 years old, last seen in San Francisco, brown hair, works in tech..."
+              rows={3}
+              className={`${inputBase} resize-none ${focused === "desc" ? inputFocus : inputIdle}`}
+            />
+          </FormField>
 
-      {/* Known Links */}
-      <div>
-        <label className="block text-xs text-text-secondary mb-1.5 uppercase tracking-wider">
-          Known Social Links
-        </label>
-        <textarea
-          value={links}
-          onChange={(e) => setLinks(e.target.value)}
-          placeholder={"instagram.com/johndoe123\ntwitter.com/johndoe\ngithub.com/johndoe"}
-          rows={3}
-          className="w-full px-4 py-3 bg-bg-card border border-border rounded-lg text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent transition-colors resize-none font-mono text-sm"
-        />
-        <p className="text-xs text-text-muted mt-1">One per line</p>
-      </div>
+          {/* Phone */}
+          <FormField label="Phone Number" delay={0.2}>
+            <input
+              type="tel"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              onFocus={() => setFocused("phone")}
+              onBlur={() => setFocused(null)}
+              placeholder="+1 (555) 123-4567"
+              className={`${inputBase} ${focused === "phone" ? inputFocus : inputIdle}`}
+            />
+          </FormField>
 
-      {/* Photo upload placeholder */}
-      <div>
-        <label className="block text-xs text-text-secondary mb-1.5 uppercase tracking-wider">
-          Photo
-        </label>
-        <div className="w-full px-4 py-8 bg-bg-card border border-dashed border-border rounded-lg text-center cursor-pointer hover:border-accent/50 transition-colors">
-          <p className="text-text-muted text-sm">
-            Drag & drop a photo or click to upload
-          </p>
-          <p className="text-text-muted text-xs mt-1">
-            Used for facial recognition matching
-          </p>
+          {/* Known Links */}
+          <FormField label="Known Social Links" delay={0.25}>
+            <textarea
+              value={links}
+              onChange={(e) => setLinks(e.target.value)}
+              onFocus={() => setFocused("links")}
+              onBlur={() => setFocused(null)}
+              placeholder={"instagram.com/johndoe123\ntwitter.com/johndoe\ngithub.com/johndoe"}
+              rows={3}
+              className={`${inputBase} resize-none font-mono text-xs ${focused === "links" ? inputFocus : inputIdle}`}
+            />
+            <p className="text-[10px] text-text-muted mt-1.5 tracking-wide">
+              One URL per line
+            </p>
+          </FormField>
+
+          {/* Photo upload placeholder */}
+          <FormField label="Photo" delay={0.3}>
+            <div className="relative w-full px-4 py-8 bg-bg-card/50 border border-dashed border-border rounded-lg text-center cursor-pointer hover:border-accent/30 hover:bg-bg-card/80 transition-all duration-300 group">
+              <div className="w-10 h-10 mx-auto mb-3 rounded-lg bg-bg-primary border border-border flex items-center justify-center group-hover:border-accent/20 transition-colors">
+                <svg
+                  className="w-5 h-5 text-text-muted group-hover:text-accent/60 transition-colors"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={1.5}
+                    d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                  />
+                </svg>
+              </div>
+              <p className="text-text-muted text-xs">
+                Drag & drop or click to upload
+              </p>
+              <p className="text-text-muted/60 text-[10px] mt-1">
+                Used for facial recognition matching
+              </p>
+            </div>
+          </FormField>
         </div>
-      </div>
 
-      {/* Submit */}
-      <button
-        type="submit"
-        disabled={loading || !name.trim()}
-        className="w-full py-4 bg-accent text-bg-primary font-bold rounded-lg text-sm uppercase tracking-wider hover:bg-accent-dim disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-      >
-        {loading ? (
-          <span className="flex items-center justify-center gap-2">
-            <span className="w-4 h-4 border-2 border-bg-primary/30 border-t-bg-primary rounded-full animate-spin" />
-            Initializing Investigation...
-          </span>
-        ) : (
-          "Investigate"
-        )}
-      </button>
+        {/* Submit button */}
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.35 }}
+          className="mt-6"
+        >
+          <button
+            type="submit"
+            disabled={loading || !name.trim()}
+            className="relative w-full py-4 bg-accent text-bg-primary font-display font-bold rounded-lg text-sm uppercase tracking-[0.15em] hover:bg-accent-bright disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-300 overflow-hidden group"
+          >
+            {/* Hover scan effect */}
+            <div
+              className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"
+              style={{
+                background:
+                  "linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent)",
+                animation: "horizontalScan 2s ease-in-out infinite",
+              }}
+            />
+
+            {loading ? (
+              <span className="flex items-center justify-center gap-3">
+                <span className="w-4 h-4 border-2 border-bg-primary/30 border-t-bg-primary rounded-full animate-spin" />
+                <span>Initializing Investigation...</span>
+              </span>
+            ) : (
+              "Begin Investigation"
+            )}
+          </button>
+        </motion.div>
+      </div>
     </form>
   );
 }
