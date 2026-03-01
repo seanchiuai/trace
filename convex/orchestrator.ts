@@ -962,7 +962,7 @@ async function executeToolCall(
           await ctx.runMutation(api.investigations.updateBrowserSession, {
             id: investigationId,
             browserSessionId: browserResult.sessionId,
-            browserLiveUrl: browserResult.liveUrl,
+            browserLiveUrl: browserResult.liveUrl ?? undefined,
           });
         }
         return toolResult;
