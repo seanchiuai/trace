@@ -107,6 +107,7 @@ Adapt to what you know. Each step is precious - make it count.
 - Instagram link or username provided -> IMMEDIATELY browser_action imginn.com/username (DO THIS FIRST, before anything else)
 ${maigretAvailable && isEnabled(TOOL_NAMES.MAIGRET_SEARCH) ? "- Username known -> start with maigret_search (wide OSINT net), then IMMEDIATELY browse imginn.com/username" : ""}
 - Name only -> parallel web_search: "Name LinkedIn", "Name Twitter", "Name Instagram", "Name GitHub"
+- ALWAYS search: "Name + Description + Instagram" (e.g. "John Doe San Francisco tech Instagram") — this often finds the exact Instagram profile when a generic name search fails
 - When you find an Instagram username from ANY source -> STOP and browse imginn.com/username before continuing
 - Common name -> add description details (city, job, age) to searches; use ask_user if results are ambiguous
 - Photo available -> parallel: geo_locate + reverse_image_search (geo_locate is approximate — corroborate with other evidence before reporting as fact)
@@ -947,18 +948,26 @@ async function executeToolCall(
         const picartaResult = await ctx.runAction(internal.tools.picarta.localize, {
           imageUrl: toolCall.args.imageUrl as string,
         });
-        // Auto-save location finding if we got coordinates
+        // Only auto-save if EXIF confirms location OR confidence is very high (>70%)
+        // Picarta is non-deterministic and gives different answers each time for the same image
         if (picartaResult.latitude && picartaResult.longitude) {
           const locationParts = [picartaResult.city, picartaResult.province, picartaResult.country].filter(Boolean);
-          const conf = picartaResult.confidence ? Math.round(picartaResult.confidence * 100) : 60;
-          await ctx.runMutation(api.investigations.addFinding, {
-            investigationId,
-            source: "picarta",
-            category: "location",
-            platform: "picarta",
-            data: `Photo geo-located to ${locationParts.join(", ")} (${picartaResult.latitude}, ${picartaResult.longitude}). Confidence: ${conf}%${picartaResult.exifCountry ? `. EXIF confirms: ${picartaResult.exifCountry}` : ""}`,
-            confidence: conf,
-          });
+          const conf = picartaResult.confidence ? Math.round(picartaResult.confidence * 100) : 0;
+          const hasExif = !!(picartaResult.exifLat && picartaResult.exifLon);
+          if (hasExif || conf >= 70) {
+            await ctx.runMutation(api.investigations.addFinding, {
+              investigationId,
+              source: "picarta",
+              category: "location",
+              platform: "picarta",
+              data: hasExif
+                ? `Photo EXIF confirms location: ${picartaResult.exifCountry ?? locationParts.join(", ")} (${picartaResult.exifLat}, ${picartaResult.exifLon}). AI prediction: ${locationParts.join(", ")} (${conf}% confidence)`
+                : `Photo geo-located to ${locationParts.join(", ")} (${picartaResult.latitude}, ${picartaResult.longitude}). Confidence: ${conf}% — treat as approximate`,
+              confidence: hasExif ? Math.max(conf, 80) : conf,
+              latitude: hasExif ? picartaResult.exifLat : picartaResult.latitude,
+              longitude: hasExif ? picartaResult.exifLon : picartaResult.longitude,
+            });
+          }
         }
         return JSON.stringify(picartaResult);
       }
