@@ -45,10 +45,10 @@ export const TOOL_CONFIG: Record<
     border: "border-orange-400/20",
   },
   geo_locate: {
-    letter: "G",
+    letter: "📍",
     color: "text-green-400",
     bg: "bg-green-400/10",
-    border: "border-green-400/20",
+    border: "border-green-400/40",
   },
   whitepages: {
     letter: "P",
@@ -57,10 +57,10 @@ export const TOOL_CONFIG: Record<
     border: "border-red-400/20",
   },
   reverse_image: {
-    letter: "I",
+    letter: "🔍",
     color: "text-pink-400",
     bg: "bg-pink-400/10",
-    border: "border-pink-400/20",
+    border: "border-pink-400/40",
   },
   darkweb: {
     letter: "D",
@@ -74,6 +74,13 @@ export const TOOL_CONFIG: Record<
     bg: "bg-amber-400/10",
     border: "border-amber-400/20",
   },
+};
+
+const GEO_TOOLS = new Set(["geo_locate", "reverse_image"]);
+
+const GEO_TOOL_LABELS: Record<string, string> = {
+  geo_locate: "PHOTO GEOLOCATION",
+  reverse_image: "REVERSE IMAGE SEARCH",
 };
 
 export function ToolBadge({ tool, size = "md" }: { tool: string; size?: "sm" | "md" }) {
@@ -111,6 +118,8 @@ export function CollapsedStep({
   step: Step;
   onExpand: () => void;
 }) {
+  const isGeo = GEO_TOOLS.has(step.tool);
+
   return (
     <motion.button
       layout
@@ -118,12 +127,16 @@ export function CollapsedStep({
       animate={{ opacity: 1, x: 0 }}
       transition={{ duration: 0.2 }}
       onClick={onExpand}
-      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-white/[0.03] transition-colors group cursor-pointer text-left"
+      className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-white/[0.03] transition-colors group cursor-pointer text-left ${
+        isGeo ? "bg-green-400/[0.04] shadow-[0_0_12px_rgba(0,255,136,0.06)]" : ""
+      }`}
     >
       <ToolBadge tool={step.tool} size="sm" />
 
-      <span className="text-[10px] font-medium text-text-muted tracking-wider uppercase whitespace-nowrap">
-        {step.tool.replace("_", " ")}
+      <span className={`text-[10px] font-medium tracking-wider uppercase whitespace-nowrap ${
+        isGeo ? "text-green-400" : "text-text-muted"
+      }`}>
+        {GEO_TOOL_LABELS[step.tool] ?? step.tool.replace("_", " ")}
       </span>
 
       <span className="text-[11px] text-text-secondary truncate flex-1 min-w-0">
@@ -157,6 +170,8 @@ export function ExpandedStep({
   isActive: boolean;
   onCollapse?: () => void;
 }) {
+  const isGeo = GEO_TOOLS.has(step.tool);
+
   return (
     <motion.div
       layout
@@ -164,9 +179,13 @@ export function ExpandedStep({
       animate={{ opacity: 1, x: 0 }}
       transition={{ duration: 0.3, ease: "easeOut" }}
       className={`rounded-xl border px-4 py-3 ${
-        isActive
-          ? "bg-accent/[0.04] border-accent/15"
-          : "bg-white/[0.02] border-border/60 cursor-pointer hover:bg-white/[0.03]"
+        isGeo && isActive
+          ? "bg-green-400/[0.06] border-green-400/30 shadow-[0_0_20px_rgba(0,255,136,0.08)]"
+          : isGeo
+            ? "bg-green-400/[0.04] border-green-400/20 cursor-pointer hover:bg-green-400/[0.06]"
+            : isActive
+              ? "bg-accent/[0.04] border-accent/15"
+              : "bg-white/[0.02] border-border/60 cursor-pointer hover:bg-white/[0.03]"
       }`}
       onClick={!isActive ? onCollapse : undefined}
     >
@@ -175,8 +194,10 @@ export function ExpandedStep({
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <span className="text-[10px] font-medium text-text-secondary tracking-wider uppercase">
-              {step.tool.replace("_", " ")}
+            <span className={`text-[10px] font-medium tracking-wider uppercase ${
+              isGeo ? "text-green-400" : "text-text-secondary"
+            }`}>
+              {GEO_TOOL_LABELS[step.tool] ?? step.tool.replace("_", " ")}
             </span>
             <span className="text-[10px] text-text-muted/60 font-mono">
               #{step.stepNumber}
@@ -188,7 +209,9 @@ export function ExpandedStep({
         </div>
 
         {isActive && (
-          <div className="w-2 h-2 rounded-full bg-accent animate-pulse shrink-0" />
+          <div className={`w-2 h-2 rounded-full animate-pulse shrink-0 ${
+            isGeo ? "bg-green-400 shadow-[0_0_8px_rgba(0,255,136,0.6)]" : "bg-accent"
+          }`} />
         )}
       </div>
 
