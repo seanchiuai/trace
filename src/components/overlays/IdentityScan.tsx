@@ -190,7 +190,7 @@ export default function IdentityScan() {
   return (
     <canvas
       ref={canvasRef}
-      className="absolute inset-0 opacity-28 pointer-events-none"
+      className="absolute inset-0 opacity-48 pointer-events-none"
     />
   );
 }

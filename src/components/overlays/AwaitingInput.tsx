@@ -150,7 +150,7 @@ export default function AwaitingInput() {
   return (
     <canvas
       ref={canvasRef}
-      className="absolute inset-0 opacity-18 pointer-events-none"
+      className="absolute inset-0 opacity-38 pointer-events-none"
     />
   );
 }

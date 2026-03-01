@@ -180,7 +180,7 @@ export default function PixelAnalysis() {
   return (
     <canvas
       ref={canvasRef}
-      className="absolute inset-0 opacity-22 pointer-events-none"
+      className="absolute inset-0 opacity-42 pointer-events-none"
     />
   );
 }

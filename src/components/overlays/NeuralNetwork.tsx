@@ -264,7 +264,7 @@ export default function NeuralNetwork() {
   return (
     <canvas
       ref={canvasRef}
-      className="absolute inset-0 opacity-25 pointer-events-none"
+      className="absolute inset-0 opacity-45 pointer-events-none"
     />
   );
 }

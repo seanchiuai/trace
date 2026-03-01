@@ -211,7 +211,7 @@ export default function CyberSurf() {
   return (
     <canvas
       ref={canvasRef}
-      className="absolute inset-0 opacity-35 pointer-events-none"
+      className="absolute inset-0 opacity-55 pointer-events-none"
     />
   );
 }

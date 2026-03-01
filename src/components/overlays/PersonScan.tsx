@@ -214,7 +214,7 @@ export default function PersonScan() {
   return (
     <canvas
       ref={canvasRef}
-      className="absolute inset-0 opacity-30 pointer-events-none"
+      className="absolute inset-0 opacity-50 pointer-events-none"
     />
   );
 }
