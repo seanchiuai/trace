@@ -399,7 +399,6 @@ export const step = internalAction({
       });
     }
 
-    // Issue 8: Build multi-tool conversation history with all tool_result blocks
     const toolResultBlocks = toolResults.map((tr) => ({
       type: "tool_result",
       tool_use_id: tr.id,
@@ -412,9 +411,8 @@ export const step = internalAction({
       { role: "user", content: toolResultBlocks },
     ];
 
-    // Issue 7: Compress history if it exceeds token threshold before scheduling
     const { history: finalHistory, compressionTokens } =
-      await compressHistory(updatedHistory, stepNumber);
+      await compressHistory(updatedHistory);
 
     if (compressionTokens) {
       await ctx.runMutation(api.investigations.updateTokenUsage, {
@@ -434,7 +432,6 @@ export const step = internalAction({
   },
 });
 
-// Issue 8: Extracted helper so it can be called in a loop for each tool call
 async function executeToolCall(
   ctx: Pick<ActionCtx, "runQuery" | "runMutation" | "runAction">,
   params: {
@@ -520,7 +517,7 @@ async function executeToolCall(
             }
           );
         } catch (error) {
-          // Issue 4: If session expired (400), create a new one and retry once
+          // Session expired (400) — create a new one and retry
           const errMsg = error instanceof Error ? error.message : String(error);
           if (
             errMsg.includes("BROWSER_TASK_CREATION_FAILED:400") &&
@@ -593,7 +590,6 @@ async function executeToolCall(
         return JSON.stringify(faceResult);
       }
 
-      // Issue 6: New web_search tool using Brave Search API
       case "web_search": {
         await ctx.runMutation(api.investigations.addStep, {
           investigationId: idTyped,
@@ -646,15 +642,13 @@ async function executeToolCall(
   }
 }
 
-// Issue 7: Compress conversation history when it exceeds token threshold
 interface CompressionResult {
   history: Array<Record<string, unknown>>;
   compressionTokens?: { input: number; output: number };
 }
 
 async function compressHistory(
-  conversationHistory: Array<Record<string, unknown>>,
-  stepNumber: number
+  conversationHistory: Array<Record<string, unknown>>
 ): Promise<CompressionResult> {
   const serialized = JSON.stringify(conversationHistory);
   const estimatedTokens = estimateTokens(serialized);
@@ -669,13 +663,11 @@ async function compressHistory(
     ? COMPRESSION_TOKEN_THRESHOLD * 1.3
     : COMPRESSION_TOKEN_THRESHOLD;
 
-  // Only compress if over threshold
   if (estimatedTokens <= effectiveThreshold || conversationHistory.length < 6) {
     return { history: conversationHistory };
   }
 
   // Each exchange = 2 messages (assistant + user/tool_result), starting at index 1
-  // Keep last KEEP_RECENT_EXCHANGES exchanges = last 2*K messages
   const keepCount = KEEP_RECENT_EXCHANGES * 2;
   let cutoffIndex = Math.max(1, conversationHistory.length - keepCount);
   // Ensure cutoff falls on an exchange boundary (odd index = assistant start)
@@ -686,7 +678,6 @@ async function compressHistory(
   const messagesToSummarize = conversationHistory.slice(1, cutoffIndex);
   const recentMessages = conversationHistory.slice(cutoffIndex);
 
-  // Build text representation of messages to summarize
   const summaryInput = messagesToSummarize
     .map((msg) => {
       const role = msg.role as string;
@@ -817,8 +808,6 @@ async function generateReport(
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new Error("ANTHROPIC_API_KEY not set");
 
-  // Issue 7: Reconstruct context from DB instead of passing full conversation history.
-  // This bounds report input to ~15K tokens regardless of step count.
   const investigation = await ctx.runQuery(api.investigations.get, {
     id: investigationId as any,
   });
