@@ -1371,7 +1371,50 @@ If you cannot determine a field, use null or an empty array. Base analysis ONLY 
     }),
   });
 
-  const [reportResult, behavioralResult] = await Promise.allSettled([reportPromise, behavioralPromise]);
+  // Profile splitting: group findings into candidate profiles
+  const profilePromise = fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: apiHeaders,
+    body: JSON.stringify({
+      model: "claude-opus-4-20250514",
+      max_tokens: 4096,
+      messages: [{
+        role: "user",
+        content: `You are an expert OSINT analyst. The following findings were collected during an investigation for "${investigation?.targetName || "Unknown"}".
+${investigation?.targetDescription ? `Description: ${investigation.targetDescription}` : ""}
+
+Multiple real people may share this name. Your job is to group these findings into candidate identity profiles — separate real individuals who could be the target.
+
+## Findings (each has a unique index)
+${findings.map((f: { category: string; data: string; confidence: number; source: string; platform?: string; _id: string }, i: number) => `[${i}] (${f.category}, ${f.confidence}%) ${f.data} — src: ${f.source}${f.platform ? `, platform: ${f.platform}` : ""} — id: ${f._id}`).join("\n")}
+
+## Rules
+- Group findings that clearly belong to the same real person (matching usernames, locations, bios, photos, linked accounts).
+- If ALL findings clearly point to one person, return a single profile.
+- Findings that don't clearly belong to any profile go in "unattributed".
+- matchConfidence = how confident you are this profile is the actual target (0-100).
+- keyEvidence = the 1-3 most important finding indices for this profile.
+- redFlags = anything suspicious or contradictory about this grouping.
+
+Respond with ONLY a valid JSON object (no markdown, no code fences):
+{
+  "profiles": [
+    {
+      "label": "Short descriptive label, e.g. 'John Smith — NYC Software Engineer'",
+      "matchConfidence": 85,
+      "findingIndices": [0, 1, 3, 5],
+      "keyEvidence": [0, 3],
+      "redFlags": ["Username age doesn't match stated age"],
+      "summary": "Brief 1-2 sentence summary of this identity"
+    }
+  ],
+  "unattributed": [2, 7]
+}`,
+      }],
+    }),
+  });
+
+  const [reportResult, behavioralResult, profileResult] = await Promise.allSettled([reportPromise, behavioralPromise, profilePromise]);
 
   // Handle report result
   if (reportResult.status === "rejected" || (reportResult.status === "fulfilled" && !reportResult.value.ok)) {
@@ -1424,10 +1467,47 @@ If you cannot determine a field, use null or an empty array. Base analysis ONLY 
     console.warn("Behavioral analysis failed (non-critical):", behavioralResult.status === "rejected" ? behavioralResult.reason : "API error");
   }
 
+  // Handle profile splitting result (non-critical - falls back to flat report)
+  let profileReportJson: string | undefined;
+  if (profileResult.status === "fulfilled" && profileResult.value.ok) {
+    try {
+      const profileData = await profileResult.value.json();
+      if (profileData.usage) {
+        await ctx.runMutation(api.investigations.updateTokenUsage, {
+          id: investigationId,
+          inputTokens: profileData.usage.input_tokens ?? 0,
+          outputTokens: profileData.usage.output_tokens ?? 0,
+        });
+      }
+      const profileText = profileData.content?.find((b: { type: string }) => b.type === "text")?.text || "";
+      if (profileText) {
+        // Validate JSON parses correctly before storing
+        const parsed = JSON.parse(profileText);
+        if (parsed.profiles && Array.isArray(parsed.profiles)) {
+          // Map finding indices to actual finding IDs for frontend lookup
+          const enriched = {
+            profiles: parsed.profiles.map((p: { label: string; matchConfidence: number; findingIndices: number[]; keyEvidence: number[]; redFlags: string[]; summary: string }) => ({
+              ...p,
+              findingIds: (p.findingIndices || []).map((i: number) => findings[i]?._id).filter(Boolean),
+              keyEvidenceIds: (p.keyEvidence || []).map((i: number) => findings[i]?._id).filter(Boolean),
+            })),
+            unattributed: (parsed.unattributed || []).map((i: number) => findings[i]?._id).filter(Boolean),
+          };
+          profileReportJson = JSON.stringify(enriched);
+        }
+      }
+    } catch (e) {
+      console.warn("Profile splitting failed (non-critical, falling back to flat report):", e);
+    }
+  } else {
+    console.warn("Profile splitting failed (non-critical):", profileResult.status === "rejected" ? profileResult.reason : "API error");
+  }
+
   await ctx.runMutation(api.investigations.updateReport, {
     id: investigationId,
     report,
     confidence: calculateOverallConfidence(findings),
+    profileReport: profileReportJson,
   });
 
   await cleanupBrowserSession(ctx, investigationId);
