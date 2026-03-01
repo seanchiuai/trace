@@ -10,10 +10,9 @@
 | 4 | Opus orchestrator loop | Pending |
 | 5 | FaceCheck API integration | Pending |
 | 6 | Frontend: input form + live browser + activity stream | Pending |
-| 7 | Supermemory integration | Pending |
-| 8 | Laminar observability tree | Backlog (cut candidate) |
-| 9 | Detective report generation + UI | Pending |
-| 10 | Polish: dark theme, animations, loading states | Pending |
+| 7 | Laminar observability tree | Backlog (cut candidate) |
+| 8 | Detective report generation + UI | Pending |
+| 9 | Polish: dark theme, animations, loading states | Pending |
 
 ## Complete
 
@@ -26,7 +25,6 @@
 - [x] Create Browser Use tool actions (create session, run task, get status)
 - [x] Create FaceCheck tool action (upload, poll, parse results)
 - [x] Create Maigret tool action (calls local sidecar)
-- [x] Create Supermemory tool actions (store, recall)
 - [x] Create reports query (assembles investigation + findings + steps)
 - [x] Create Maigret Python sidecar (FastAPI server.py + requirements.txt)
 - [x] Create all frontend components (InputForm, BrowserView, ActivityStream, FindingsGrid, FaceScan, DetectiveReport, LeadTree, ImageGallery)
@@ -76,10 +74,6 @@
 - [ ] Verify Browser Use iframe loads live URL
 - [ ] Test activity stream auto-scroll and animation
 
-### Phase 7: Supermemory
-- [ ] Sign up for Supermemory API key
-- [ ] Integrate memory store/recall into orchestrator loop
-- [ ] Test memory persistence across investigation steps
 
 ### Phase 8: Laminar (cut candidate)
 - [ ] Evaluate if Laminar adds enough value for demo

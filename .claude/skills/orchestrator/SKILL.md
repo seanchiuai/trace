@@ -125,4 +125,3 @@ The system prompt defines:
 | `convex/tools/browserUse.ts` | `createSession`, `runTask`, `getTaskStatus` |
 | `convex/tools/faceCheck.ts` | `searchByImage`, `extractPlatform` |
 | `convex/tools/maigret.ts` | `search` |
-| `convex/tools/supermemory.ts` | `store`, `recall` |
