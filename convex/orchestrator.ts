@@ -8,7 +8,7 @@ const MAX_STEPS = 20;
 const SYSTEM_PROMPT = `You are an expert missing persons investigator. You think methodically, follow leads, and build a comprehensive picture of a person's digital footprint.
 
 You have access to these tools:
-1. maigret_search(username) — Search 3,000+ sites for matching profiles. High false positive rate (~86%), so filter results using known info (name, location, age, bio).
+1. maigret_search(username) — Intelligent OSINT: searches 3,000+ sites for the username, then an AI reads all profile bios/metadata to extract REAL connected handles (e.g. "X: @handle" in a Telegram bio, GitHub profile linking to Twitter, etc.), and automatically searches those leads too. Returns primary profiles, AI-extracted leads with reasoning, lead search results, and a connection graph. One call gives you a deep web of connected accounts — not just the primary username.
 2. browser_action(instruction) — Control a web browser. Give clear instructions like "Go to instagram.com/username and report what you see." Returns screenshots and page text.
 3. face_check(imageUrl) — Run facial recognition on an image. Returns matching profiles with confidence scores. Use on group photos or profile pictures.
 4. save_finding(source, category, platform, data, confidence) — Save a confirmed finding. Categories: "social", "connection", "location", "activity", "identity".
@@ -101,7 +101,7 @@ export const step = internalAction({
           {
             name: "maigret_search",
             description:
-              "Search for a username across 3,000+ sites using Maigret. Returns profile URLs and metadata.",
+              "Intelligent OSINT search: searches a username across 3,000+ sites, then uses AI to extract connected handles/leads from profile bios and metadata (e.g. 'X: @handle' in a Telegram bio), and automatically searches those leads too. Returns primary profiles, extracted leads with reasoning, lead profiles, and a connection graph.",
             input_schema: {
               type: "object",
               properties: {
@@ -250,14 +250,45 @@ export const step = internalAction({
           await ctx.runMutation(api.investigations.addStep, {
             investigationId: args.investigationId,
             stepNumber,
-            action: `Running Maigret search for "${toolCall.args.username}"`,
+            action: `Running intelligent OSINT search for "${toolCall.args.username}" — searching 3,000+ sites, extracting leads via AI, following connections`,
             tool: "maigret",
           });
-          const maigretResult = await ctx.runAction(
-            internal.tools.maigret.search,
-            { username: toolCall.args.username as string }
+          const investigateResult = await ctx.runAction(
+            internal.tools.maigret.investigate,
+            {
+              username: toolCall.args.username as string,
+              targetName: investigation.targetName || undefined,
+              targetDescription: investigation.targetDescription || undefined,
+            }
           );
-          toolResult = JSON.stringify(maigretResult);
+
+          // Format the results so Opus gets actionable intelligence
+          const formattedResult = formatInvestigationForOpus(investigateResult);
+          toolResult = formattedResult;
+
+          // Auto-save leads as findings
+          if (investigateResult.leads_extracted?.length > 0) {
+            for (const lead of investigateResult.leads_extracted.slice(0, 5)) {
+              await ctx.runMutation(api.investigations.addFinding, {
+                investigationId: args.investigationId,
+                source: "maigret",
+                category: "connection",
+                platform: lead.platform || undefined,
+                data: `Lead extracted: @${lead.username}${lead.platform ? ` on ${lead.platform}` : ""} — ${lead.reason}`,
+                confidence: 70,
+              });
+            }
+          }
+
+          // Log the AI analysis as a step
+          if (investigateResult.llm_analysis) {
+            await ctx.runMutation(api.investigations.addStep, {
+              investigationId: args.investigationId,
+              stepNumber,
+              action: `AI Lead Analysis: ${investigateResult.llm_analysis.slice(0, 500)}`,
+              tool: "reasoning",
+            });
+          }
           break;
         }
 
@@ -443,6 +474,85 @@ Format as markdown. Be thorough and professional.`,
     id: investigationId as any,
     status: "complete",
   });
+}
+
+function formatInvestigationForOpus(result: {
+  primary_username: string;
+  primary_profiles: Record<string, Record<string, unknown>>;
+  leads_extracted: Array<{ username: string; platform?: string; reason: string }>;
+  lead_profiles: Record<string, Record<string, Record<string, unknown>>>;
+  lead_graph: Array<{ from: string; to: string; platform?: string; reason: string }>;
+  llm_analysis: string;
+  total_profiles: number;
+  error?: string;
+}): string {
+  const sections: string[] = [];
+
+  // Header
+  sections.push(`=== OSINT Investigation: @${result.primary_username} ===`);
+  sections.push(`Total profiles found: ${result.total_profiles}`);
+  if (result.error) sections.push(`⚠ Error: ${result.error}`);
+
+  // Primary profiles
+  sections.push(`\n--- Primary Profiles (username: ${result.primary_username}) ---`);
+  for (const [site, profile] of Object.entries(result.primary_profiles)) {
+    const p = profile as Record<string, unknown>;
+    const details: string[] = [`${(p.site_name as string) || site}: ${p.url as string}`];
+    if (p.fullname) details.push(`  Name: ${p.fullname}`);
+    if (p.bio) details.push(`  Bio: ${p.bio}`);
+    if (p.location) details.push(`  Location: ${p.location}`);
+    if (p.is_company) details.push(`  Company: ${p.is_company}`);
+    if (p.image) details.push(`  Avatar: ${p.image}`);
+    if (p.created_at) details.push(`  Joined: ${p.created_at}`);
+    if (p.follower_count) details.push(`  Followers: ${p.follower_count}`);
+    if (p.following_count) details.push(`  Following: ${p.following_count}`);
+    sections.push(details.join("\n"));
+  }
+
+  // AI analysis
+  if (result.llm_analysis) {
+    sections.push(`\n--- AI Analysis ---`);
+    sections.push(result.llm_analysis);
+  }
+
+  // Extracted leads
+  if (result.leads_extracted.length > 0) {
+    sections.push(`\n--- Extracted Leads (${result.leads_extracted.length} found) ---`);
+    for (const lead of result.leads_extracted) {
+      sections.push(
+        `• @${lead.username}${lead.platform ? ` (${lead.platform})` : ""} — ${lead.reason}`
+      );
+    }
+  }
+
+  // Lead profiles (results from searching the leads)
+  const leadUsernames = Object.keys(result.lead_profiles);
+  if (leadUsernames.length > 0) {
+    sections.push(`\n--- Lead Search Results ---`);
+    for (const [leadUsername, profiles] of Object.entries(result.lead_profiles)) {
+      const profileCount = Object.keys(profiles).length;
+      sections.push(`\n@${leadUsername} → ${profileCount} profiles found:`);
+      for (const [site, profile] of Object.entries(profiles)) {
+        const p = profile as Record<string, unknown>;
+        const line = [`  ${(p.site_name as string) || site}: ${p.url as string}`];
+        if (p.fullname) line.push(`(${p.fullname})`);
+        if (p.bio) line.push(`— "${(p.bio as string).slice(0, 100)}"`);
+        sections.push(line.join(" "));
+      }
+    }
+  }
+
+  // Connection graph
+  if (result.lead_graph.length > 0) {
+    sections.push(`\n--- Connection Graph ---`);
+    for (const edge of result.lead_graph) {
+      sections.push(
+        `@${edge.from} → @${edge.to}${edge.platform ? ` [${edge.platform}]` : ""}: ${edge.reason}`
+      );
+    }
+  }
+
+  return sections.join("\n");
 }
 
 function calculateOverallConfidence(
