@@ -65,6 +65,7 @@ Convex dashboard (Settings → Environment Variables):
 - `ANTHROPIC_API_KEY` — Claude API key for orchestrator
 - `BROWSER_USE_API_KEY` — Browser Use Cloud API key
 - `FACECHECK_API_KEY` — FaceCheck.id API key
+- `MAIGRET_SIDECAR_URL` — Maigret sidecar URL (optional, defaults to `http://localhost:8000`)
 
 ## Boundaries
 
