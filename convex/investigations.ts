@@ -242,6 +242,13 @@ export const generateUploadUrl = mutation({
   },
 });
 
+export const getStorageUrl = query({
+  args: { storageId: v.id("_storage") },
+  handler: async (ctx, args) => {
+    return await ctx.storage.getUrl(args.storageId);
+  },
+});
+
 // ── Clarification mutations/queries ──
 
 export const createClarification = mutation({
