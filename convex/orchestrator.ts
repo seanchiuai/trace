@@ -16,34 +16,53 @@ function estimateTokens(text: string): number {
 }
 
 // Issue 3: Adaptive system prompt — no fixed strategy, considers target type & available info
-const SYSTEM_PROMPT = `You are an expert missing persons investigator. You think methodically, follow leads, and build a comprehensive picture of a person's digital footprint.
+// Maigret tool description and strategy are conditionally included based on sidecar availability
+function buildSystemPrompt(maigretAvailable: boolean): string {
+  const toolLines: string[] = [];
+  let n = 1;
+  if (maigretAvailable) {
+    toolLines.push(
+      `${n++}. maigret_search(username) — Intelligent OSINT: searches 3,000+ sites for the username, then an AI reads all profile bios/metadata to extract REAL connected handles (e.g. "X: @handle" in a Telegram bio, GitHub profile linking to Twitter, etc.), and automatically searches those leads too. Returns primary profiles, AI-extracted leads with reasoning, lead search results, and a connection graph. One call gives you a deep web of connected accounts — not just the primary username.`
+    );
+  }
+  toolLines.push(
+    `${n++}. browser_action(instruction) — Control a web browser. Give clear instructions like "Go to instagram.com/username and report what you see." Returns screenshots and page text. Use for interactive pages that require login walls, scrolling, or JS rendering. EXPENSIVE — prefer web_search for simple lookups.`,
+    `${n++}. face_check(imageUrl) — Run facial recognition on an image. Returns matching profiles with confidence scores. Use on group photos or profile pictures.`,
+    `${n++}. web_search(query, count?) — Fast web search. Returns titles, URLs, and snippets. Use this FIRST for simple lookups like "John Smith LinkedIn", "username site:twitter.com", company info, news articles, etc. Much faster and cheaper than browser_action.`,
+    `${n++}. save_finding(source, category, platform, data, confidence) — Save a confirmed finding. Categories: "social", "connection", "location", "activity", "identity". FREE — does not count toward your step budget. Save findings liberally as you discover them.`,
+    `${n++}. done(report) — End the investigation and generate the final report.`
+  );
+
+  const strategyBullets: string[] = [
+    `- Look at the available info summary to decide your first move:`,
+    ...(maigretAvailable
+      ? [`  - Username known → start with maigret_search to cast a wide OSINT net`]
+      : []),
+    `  - Only a name → use web_search to find usernames, profiles, and leads first`,
+    `  - Photo available → consider face_check early to find visual matches`,
+    `  - Social links provided → explore those profiles directly (web_search or browser_action)`,
+    `  - Phone number → search it via web_search`,
+    `- Consider the target type and pick platforms accordingly:`,
+    `  - Younger person → prioritize TikTok, Instagram, Snapchat, Discord`,
+    `  - Professional → prioritize LinkedIn, GitHub, company pages`,
+    `  - Founder/entrepreneur → check Crunchbase, AngelList, press coverage`,
+    `  - General → cast a wide net across major platforms`,
+    `- Use web_search for simple lookups; reserve browser_action for pages that need interaction`,
+    `- Save findings as you go (it's free — doesn't burn steps)`,
+    `- You can call multiple tools at once — do so when actions are independent`,
+    `- After gathering enough evidence (or nearing 20 steps), call done()`,
+  ];
+
+  return `You are an expert missing persons investigator. You think methodically, follow leads, and build a comprehensive picture of a person's digital footprint.
 
 You have access to these tools:
-1. maigret_search(username) — Intelligent OSINT: searches 3,000+ sites for the username, then an AI reads all profile bios/metadata to extract REAL connected handles (e.g. "X: @handle" in a Telegram bio, GitHub profile linking to Twitter, etc.), and automatically searches those leads too. Returns primary profiles, AI-extracted leads with reasoning, lead search results, and a connection graph. One call gives you a deep web of connected accounts — not just the primary username.
-2. browser_action(instruction) — Control a web browser. Give clear instructions like "Go to instagram.com/username and report what you see." Returns screenshots and page text. Use for interactive pages that require login walls, scrolling, or JS rendering. EXPENSIVE — prefer web_search for simple lookups.
-3. face_check(imageUrl) — Run facial recognition on an image. Returns matching profiles with confidence scores. Use on group photos or profile pictures.
-4. web_search(query, count?) — Fast web search. Returns titles, URLs, and snippets. Use this FIRST for simple lookups like "John Smith LinkedIn", "username site:twitter.com", company info, news articles, etc. Much faster and cheaper than browser_action.
-5. save_finding(source, category, platform, data, confidence) — Save a confirmed finding. Categories: "social", "connection", "location", "activity", "identity". FREE — does not count toward your step budget. Save findings liberally as you discover them.
-6. done(report) — End the investigation and generate the final report.
+${toolLines.join("\n")}
 
 Strategy — ADAPT to what you know:
-- Look at the available info summary to decide your first move:
-  - Username known → start with maigret_search to cast a wide OSINT net
-  - Only a name → use web_search to find usernames, profiles, and leads first
-  - Photo available → consider face_check early to find visual matches
-  - Social links provided → explore those profiles directly (web_search or browser_action)
-  - Phone number → search it via web_search
-- Consider the target type and pick platforms accordingly:
-  - Younger person → prioritize TikTok, Instagram, Snapchat, Discord
-  - Professional → prioritize LinkedIn, GitHub, company pages
-  - Founder/entrepreneur → check Crunchbase, AngelList, press coverage
-  - General → cast a wide net across major platforms
-- Use web_search for simple lookups; reserve browser_action for pages that need interaction
-- Save findings as you go (it's free — doesn't burn steps)
-- You can call multiple tools at once — do so when actions are independent
-- After gathering enough evidence (or nearing 20 steps), call done()
+${strategyBullets.join("\n")}
 
 Always explain your reasoning before choosing an action. Be thorough but efficient.`;
+}
 
 // Issue 8: ToolCall now carries the tool_use_id for proper multi-tool responses
 interface ToolCall {
@@ -196,6 +215,16 @@ export const startInvestigation = action({
       console.warn("Eager browser session creation failed (non-blocking):", e);
     }
 
+    // Health-check maigret sidecar — if unreachable, exclude from tools so the agent never wastes steps on it
+    let maigretAvailable = false;
+    try {
+      const health = await ctx.runAction(internal.tools.maigret.healthCheck, {});
+      maigretAvailable = health.healthy === true;
+    } catch {
+      // Sidecar unreachable — will be excluded from tools
+    }
+    console.log(`Maigret sidecar health check: ${maigretAvailable ? "available" : "unavailable"}`);
+
     // Issue 3: Build an "available info summary" so the agent adapts its first move
     const infoLines: string[] = [];
     infoLines.push(`Name: ${investigation.targetName}`);
@@ -230,6 +259,7 @@ Begin your investigation. Adapt your strategy to the available information — w
         },
       ]),
       consecutiveSaveOnlySteps: 0,
+      maigretAvailable,
     });
   },
 });
@@ -239,6 +269,7 @@ export const step = internalAction({
     investigationId: v.id("investigations"),
     conversationHistory: v.string(),
     consecutiveSaveOnlySteps: v.optional(v.number()),
+    maigretAvailable: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const investigation = await ctx.runQuery(api.investigations.get, {
@@ -257,6 +288,12 @@ export const step = internalAction({
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) throw new Error("ANTHROPIC_API_KEY not set");
 
+    // Exclude maigret tool if sidecar is unavailable
+    const maigretAvailable = args.maigretAvailable ?? false;
+    const tools = maigretAvailable
+      ? TOOL_DEFINITIONS
+      : TOOL_DEFINITIONS.filter((t) => t.name !== "maigret_search");
+
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
@@ -267,9 +304,9 @@ export const step = internalAction({
       body: JSON.stringify({
         model: "claude-opus-4-20250514",
         max_tokens: 2048,
-        system: SYSTEM_PROMPT,
+        system: buildSystemPrompt(maigretAvailable),
         messages: conversationHistory,
-        tools: TOOL_DEFINITIONS,
+        tools,
       }),
     });
 
@@ -408,6 +445,7 @@ export const step = internalAction({
       investigationId: args.investigationId,
       conversationHistory: JSON.stringify(finalHistory),
       consecutiveSaveOnlySteps: consecutiveSaveOnly,
+      maigretAvailable,
     });
   },
 });
