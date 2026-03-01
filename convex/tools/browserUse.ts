@@ -84,7 +84,6 @@ export const runTask = internalAction({
   handler: async (ctx, args) => {
     const body: Record<string, unknown> = {
       task: args.task,
-      model: "bu-mini",
       keepAlive: true,
     };
 
