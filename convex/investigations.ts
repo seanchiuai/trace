@@ -8,6 +8,7 @@ export const create = mutation({
     targetPhone: v.optional(v.string()),
     targetPhoto: v.optional(v.string()),
     knownLinks: v.array(v.string()),
+    instructions: v.optional(v.string()),
     extremeMode: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
@@ -18,6 +19,7 @@ export const create = mutation({
       targetPhone: args.targetPhone,
       targetPhoto: args.targetPhoto,
       knownLinks: args.knownLinks,
+      instructions: args.instructions,
       extremeMode: args.extremeMode,
       status: "planning",
       stepCount: 0,
