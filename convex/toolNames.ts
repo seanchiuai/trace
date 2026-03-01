@@ -8,6 +8,7 @@ export const TOOL_NAMES = {
   REVERSE_IMAGE_SEARCH: "reverse_image_search",
   WHITEPAGES_LOOKUP: "whitepages_lookup",
   DARKWEB_SEARCH: "darkweb_search",
+  DEHASHED_SEARCH: "dehashed_search",
 } as const;
 
 export type ToolName = (typeof TOOL_NAMES)[keyof typeof TOOL_NAMES];
@@ -25,4 +26,5 @@ export const STANDARD_TOOL_DEFS = [
 export const EXTREME_TOOL_DEFS = [
   { name: TOOL_NAMES.WHITEPAGES_LOOKUP, label: "WhitePages Lookup" },
   { name: TOOL_NAMES.DARKWEB_SEARCH, label: "Dark Web Search" },
+  { name: TOOL_NAMES.DEHASHED_SEARCH, label: "Breach Database" },
 ] as const;

@@ -68,6 +68,12 @@ export const TOOL_CONFIG: Record<
     bg: "bg-red-500/10",
     border: "border-red-500/20",
   },
+  dehashed: {
+    letter: "B",
+    color: "text-orange-400",
+    bg: "bg-orange-400/10",
+    border: "border-orange-400/20",
+  },
   ask_user: {
     letter: "?",
     color: "text-amber-400",

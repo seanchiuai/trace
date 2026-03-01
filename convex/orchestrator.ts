@@ -55,6 +55,11 @@ function buildSystemPrompt(maigretAvailable: boolean, extremeMode: boolean = fal
       `${n++}. darkweb_search(term, maxResults?) - Search leaked databases and paste sites for emails, usernames, phones.`
     );
   }
+  if (extremeMode && isEnabled(TOOL_NAMES.DEHASHED_SEARCH)) {
+    toolLines.push(
+      `${n++}. dehashed_search(query, searchType) - Search breach databases. searchType: email|username|name|phone|ip_address|address|domain|password. Returns leaked emails, passwords, usernames, IPs, phones, addresses, and which breach they came from. POWERFUL for identity linkage — passwords often contain real names, birth years, cities.`
+    );
+  }
   toolLines.push(
     `${n++}. save_finding(source, category, platform, data, confidence, imageUrl?, profileUrl?) - Save a confirmed finding. Categories: "social", "connection", "location", "activity", "identity". FREE - does not count toward your step budget. Save liberally. Always include imageUrl when you have one.`,
     `${n++}. ask_user(question, options, context?) - Ask the user a clarifying question with 2-4 selectable options. Use when results are ambiguous and a quick answer would save multiple steps (e.g. "Found 12 John Smiths - which city are they likely in?"). Always include "Not sure" as the last option. FREE - doesn't burn steps.`,
@@ -348,6 +353,26 @@ const TOOL_DEFINITIONS = [
     },
   },
   {
+    name: "dehashed_search",
+    description:
+      "Search breach databases for leaked credentials and personal data. Returns emails, passwords (plaintext when available), usernames, IPs, phones, addresses, and breach source. EXTREME MODE ONLY.",
+    input_schema: {
+      type: "object",
+      properties: {
+        query: {
+          type: "string",
+          description: "The value to search for (email, username, name, phone, etc.)",
+        },
+        searchType: {
+          type: "string",
+          enum: ["email", "username", "name", "phone", "ip_address", "address", "domain", "password"],
+          description: "What type of field to search by",
+        },
+      },
+      required: ["query", "searchType"],
+    },
+  },
+  {
     name: "save_finding",
     description: "Save a confirmed finding from the investigation. FREE - does not count toward your step budget.",
     input_schema: {
@@ -562,6 +587,7 @@ export const step = internalAction({
       if (t.name === TOOL_NAMES.MAIGRET_SEARCH && !maigretAvailable) return false;
       if (t.name === TOOL_NAMES.WHITEPAGES_LOOKUP && !extremeMode) return false;
       if (t.name === TOOL_NAMES.DARKWEB_SEARCH && !extremeMode) return false;
+      if (t.name === TOOL_NAMES.DEHASHED_SEARCH && !extremeMode) return false;
       if (t.name === TOOL_NAMES.BROWSER_ACTION && browserActionsUsed >= MAX_BROWSER_ACTIONS) return false;
       return true;
     });
@@ -1080,6 +1106,32 @@ async function executeToolCall(
           });
         }
         return JSON.stringify(dwResult);
+      }
+
+      case "dehashed_search": {
+        await ctx.runMutation(api.investigations.addStep, {
+          investigationId,
+          stepNumber,
+          action: `Breach Search: ${toolCall.args.searchType}:${(toolCall.args.query as string).slice(0, 80)}`,
+          tool: "dehashed",
+        });
+        const dhResult = await ctx.runAction(internal.tools.dehashed.search, {
+          query: toolCall.args.query as string,
+          searchType: toolCall.args.searchType as string,
+          size: 20,
+        });
+        // Auto-save breach summary
+        if (dhResult.results && dhResult.results.length > 0) {
+          const summary = dhResult.summary;
+          await ctx.runMutation(api.investigations.addFinding, {
+            investigationId,
+            source: "dehashed",
+            category: "identity",
+            data: `Breach data for ${dhResult.searchType}:"${dhResult.query}": ${summary.totalResults} records, ${summary.passwordsFound} passwords found, ${summary.breachSources.length} breach source(s)${summary.breachSources.length > 0 ? ` (${summary.breachSources.slice(0, 5).join(", ")})` : ""}`,
+            confidence: 75,
+          });
+        }
+        return JSON.stringify(dhResult);
       }
 
       case "save_finding": {
