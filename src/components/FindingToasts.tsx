@@ -102,7 +102,7 @@ export default function FindingToasts({ findings, investigationId, isLive, direc
   return (
     <>
       {/* Toast stack */}
-      <div className="fixed bottom-16 right-5 z-30 flex flex-col-reverse gap-2 max-sm:right-3 max-sm:left-3">
+      <div className="fixed bottom-16 right-5 z-30 flex flex-col-reverse gap-2 max-sm:right-3 max-sm:left-3 pointer-events-none">
         <AnimatePresence>
           {visibleToasts.map((finding) => {
             const dotColor = CATEGORY_DOT[finding.category] || "bg-cyan-400";
@@ -115,7 +115,7 @@ export default function FindingToasts({ findings, investigationId, isLive, direc
                 animate={{ x: 0, opacity: 1, scale: 1 }}
                 exit={{ x: 60, opacity: 0, scale: 0.95 }}
                 transition={{ type: "spring", damping: 25, stiffness: 300 }}
-                className="w-80 max-sm:w-full bg-bg-secondary/90 backdrop-blur-xl border border-white/[0.06] rounded-xl p-3 cursor-pointer hover:border-white/[0.12] transition-colors"
+                className="w-80 max-sm:w-full bg-bg-secondary/90 backdrop-blur-xl border border-white/[0.06] rounded-xl p-3 cursor-pointer hover:border-white/[0.12] transition-colors pointer-events-auto"
                 style={{
                   animation: "toastGlow 0.6s ease-out",
                   boxShadow: "0 4px 20px rgba(0, 0, 0, 0.3)",
