@@ -95,12 +95,12 @@ Combine save_finding calls with your next research action in the same turn.
 Adapt to what you know. Each step is precious - make it count.
 
 **Phase 1 - Cast the Net (Steps 1-5):**
-${maigretAvailable ? "- Username known -> start with maigret_search (wide OSINT net)" : ""}
+${maigretAvailable && isEnabled("maigret_search") ? "- Username known -> start with maigret_search (wide OSINT net)" : ""}
 - Name only -> parallel web_search: "Name LinkedIn", "Name Twitter", "Name Instagram", "Name GitHub"
 - Common name -> add description details (city, job, age) to searches; use ask_user if results are ambiguous
 - Photo available -> parallel: geo_locate + reverse_image_search
 - Links provided -> web_search each link for context
-${extremeMode ? "- Email/username -> darkweb_search for breach records" : ""}
+${extremeMode && isEnabled("darkweb_search") ? "- Email/username -> darkweb_search for breach records" : ""}
 
 **Phase 2 - Follow Leads (Steps 6-14):**
 - Cross-reference findings: verify identities across platforms

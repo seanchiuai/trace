@@ -241,8 +241,16 @@ export default function InputForm({ onSubmit, loading }: InputFormProps) {
               animate={{ opacity: 1, height: "auto" }}
               className="mt-2 space-y-1"
             >
-              {STANDARD_TOOLS.map((tool) => {
+              {[...STANDARD_TOOLS, ...(extremeMode ? EXTREME_TOOLS : [])].map((tool) => {
                 const enabled = !disabledTools.has(tool.name);
+                const extreme = EXTREME_TOOLS.some((t) => t.name === tool.name);
+                const onColor = extreme ? "bg-red-500/25" : "bg-accent/25";
+                const onBorder = extreme ? "border-red-500/40" : "border-accent/40";
+                const onDot = extreme
+                  ? "bg-red-400 shadow-[0_0_6px_rgba(239,68,68,0.4)]"
+                  : "bg-accent shadow-[0_0_6px_rgba(0,255,136,0.4)]";
+                const labelColor = !enabled ? "text-text-muted/50"
+                  : extreme ? "text-red-400/80" : "text-text-secondary";
                 return (
                   <button
                     key={tool.name}
@@ -257,53 +265,18 @@ export default function InputForm({ onSubmit, loading }: InputFormProps) {
                     }}
                     className="w-full flex items-center justify-between px-4 py-2 rounded-md hover:bg-bg-card/60 transition-colors"
                   >
-                    <span className={`text-[11px] font-mono ${enabled ? "text-text-secondary" : "text-text-muted/50"}`}>
+                    <span className={`text-[11px] font-mono ${labelColor}`}>
                       {tool.label}
                     </span>
                     <div
                       className={`relative w-8 h-4 rounded-full transition-colors duration-300 ${
-                        enabled ? "bg-accent/25" : "bg-bg-primary"
-                      } border ${enabled ? "border-accent/40" : "border-border"}`}
+                        enabled ? onColor : "bg-bg-primary"
+                      } border ${enabled ? onBorder : "border-border"}`}
                     >
                       <div
                         className={`absolute top-0.5 w-3 h-3 rounded-full transition-all duration-300 ${
                           enabled
-                            ? "left-[calc(100%-14px)] bg-accent shadow-[0_0_6px_rgba(0,255,136,0.4)]"
-                            : "left-0.5 bg-text-muted/40"
-                        }`}
-                      />
-                    </div>
-                  </button>
-                );
-              })}
-              {extremeMode && EXTREME_TOOLS.map((tool) => {
-                const enabled = !disabledTools.has(tool.name);
-                return (
-                  <button
-                    key={tool.name}
-                    type="button"
-                    onClick={() => {
-                      setDisabledTools((prev) => {
-                        const next = new Set(prev);
-                        if (next.has(tool.name)) next.delete(tool.name);
-                        else next.add(tool.name);
-                        return next;
-                      });
-                    }}
-                    className="w-full flex items-center justify-between px-4 py-2 rounded-md hover:bg-bg-card/60 transition-colors"
-                  >
-                    <span className={`text-[11px] font-mono ${enabled ? "text-red-400/80" : "text-text-muted/50"}`}>
-                      {tool.label}
-                    </span>
-                    <div
-                      className={`relative w-8 h-4 rounded-full transition-colors duration-300 ${
-                        enabled ? "bg-red-500/25" : "bg-bg-primary"
-                      } border ${enabled ? "border-red-500/40" : "border-border"}`}
-                    >
-                      <div
-                        className={`absolute top-0.5 w-3 h-3 rounded-full transition-all duration-300 ${
-                          enabled
-                            ? "left-[calc(100%-14px)] bg-red-400 shadow-[0_0_6px_rgba(239,68,68,0.4)]"
+                            ? `left-[calc(100%-14px)] ${onDot}`
                             : "left-0.5 bg-text-muted/40"
                         }`}
                       />
