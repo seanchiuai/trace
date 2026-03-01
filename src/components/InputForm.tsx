@@ -226,11 +226,14 @@ export default function InputForm({ onSubmit, loading }: InputFormProps) {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
             </svg>
           </button>
+          <AnimatePresence>
           {integrationsOpen && (
             <motion.div
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: "auto" }}
-              className="mt-2 space-y-1"
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.25 }}
+              className="mt-2 space-y-1 overflow-hidden"
             >
               {[...STANDARD_TOOLS, ...(extremeMode ? EXTREME_TOOLS : [])].map((tool) => {
                 const enabled = !disabledTools.has(tool.name);
@@ -277,6 +280,7 @@ export default function InputForm({ onSubmit, loading }: InputFormProps) {
               })}
             </motion.div>
           )}
+          </AnimatePresence>
         </motion.div>
 
         {/* Extreme Mode toggle */}
