@@ -21,6 +21,7 @@ export default defineSchema({
     browserSessionId: v.optional(v.string()),
     browserLiveUrl: v.optional(v.string()),
     report: v.optional(v.string()),
+    profileReport: v.optional(v.string()),
     confidence: v.optional(v.number()),
     instructions: v.optional(v.string()),
     extremeMode: v.optional(v.boolean()),
