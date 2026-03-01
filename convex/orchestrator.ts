@@ -37,7 +37,7 @@ function buildSystemPrompt(maigretAvailable: boolean, extremeMode: boolean = fal
   }
   if (isEnabled(TOOL_NAMES.GEO_LOCATE)) {
     toolLines.push(
-      `${n++}. geo_locate(imageUrl) - Picarta AI geolocation. Returns coordinates, confidence, EXIF, top-3 predictions.`
+      `${n++}. geo_locate(imageUrl) - Picarta AI geolocation. Returns coordinates, confidence, EXIF, top-3 predictions. CAVEAT: Picarta predictions are rough estimates — treat results with a grain of salt. Only trust high-confidence results (>70%) backed by EXIF data or corroborating evidence. Never state a location as confirmed based on Picarta alone.`
     );
   }
   if (isEnabled(TOOL_NAMES.REVERSE_IMAGE_SEARCH)) {
@@ -99,7 +99,7 @@ Adapt to what you know. Each step is precious - make it count.
 ${maigretAvailable && isEnabled(TOOL_NAMES.MAIGRET_SEARCH) ? "- Username known -> start with maigret_search (wide OSINT net)" : ""}
 - Name only -> parallel web_search: "Name LinkedIn", "Name Twitter", "Name Instagram", "Name GitHub"
 - Common name -> add description details (city, job, age) to searches; use ask_user if results are ambiguous
-- Photo available -> parallel: geo_locate + reverse_image_search
+- Photo available -> parallel: geo_locate + reverse_image_search (geo_locate is approximate — corroborate with other evidence before reporting as fact)
 - Links provided -> web_search each link for context
 ${extremeMode && isEnabled(TOOL_NAMES.DARKWEB_SEARCH) ? "- Email/username -> darkweb_search for breach records" : ""}
 
