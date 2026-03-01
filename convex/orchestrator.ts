@@ -250,12 +250,19 @@ export const step = internalAction({
           await ctx.runMutation(api.investigations.addStep, {
             investigationId: args.investigationId,
             stepNumber,
-            action: `Running Maigret search for "${toolCall.args.username}"`,
+            action: `Running Maigret search for "${toolCall.args.username}" across 3,000+ sites`,
             tool: "maigret",
           });
           const maigretResult = await ctx.runAction(
             internal.tools.maigret.search,
-            { username: toolCall.args.username as string }
+            {
+              username: toolCall.args.username as string,
+              filterContext: {
+                name: investigation.targetName || undefined,
+                location: undefined,
+                bio: investigation.targetDescription || undefined,
+              },
+            }
           );
           toolResult = JSON.stringify(maigretResult);
           break;
