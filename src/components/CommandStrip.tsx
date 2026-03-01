@@ -51,10 +51,6 @@ export default function CommandStrip({ steps, isLive, progress, onStop }: Comman
     });
   };
 
-  useEffect(() => {
-    if (!isLive) setStopping(false);
-  }, [isLive]);
-
   const lastStepId = steps.length > 0 ? steps[steps.length - 1]._id : null;
 
   return (
