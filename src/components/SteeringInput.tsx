@@ -16,6 +16,7 @@ export default function SteeringInput({
   const [message, setMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [showError, setShowError] = useState(false);
   const createDirective = useMutation(api.directives.createDirective);
 
   if (!isLive) return null;
@@ -36,6 +37,8 @@ export default function SteeringInput({
       setTimeout(() => setShowConfirm(false), 2000);
     } catch (e) {
       console.error("Failed to send directive:", e);
+      setShowError(true);
+      setTimeout(() => setShowError(false), 2000);
     } finally {
       setSubmitting(false);
     }
@@ -58,11 +61,12 @@ export default function SteeringInput({
             onChange={(e) => setMessage(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Steer the investigation..."
+            maxLength={500}
             disabled={submitting}
             className="w-full bg-bg-card/80 backdrop-blur-sm border border-border/60 rounded-lg px-3 py-2 text-[13px] text-text-primary placeholder:text-text-muted/40 focus:outline-none focus:border-accent/40 focus:ring-1 focus:ring-accent/20 transition-all disabled:opacity-50 font-mono"
           />
 
-          {/* Queued confirmation flash */}
+          {/* Queued confirmation / error flash */}
           <AnimatePresence>
             {showConfirm && (
               <motion.div
@@ -72,6 +76,16 @@ export default function SteeringInput({
                 className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-accent font-mono tracking-wide"
               >
                 Directive queued
+              </motion.div>
+            )}
+            {showError && (
+              <motion.div
+                initial={{ opacity: 0, y: 4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-danger font-mono tracking-wide"
+              >
+                Failed to send
               </motion.div>
             )}
           </AnimatePresence>

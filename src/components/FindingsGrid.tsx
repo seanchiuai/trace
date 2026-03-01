@@ -5,7 +5,7 @@ import type { Id } from "../../convex/_generated/dataModel";
 import { motion, AnimatePresence } from "framer-motion";
 
 interface Finding {
-  _id: string;
+  _id: Id<"findings">;
   source: string;
   category: string;
   platform?: string;
@@ -14,6 +14,11 @@ interface Finding {
   data: string;
   confidence: number;
   createdAt: number;
+}
+
+interface Directive {
+  findingId?: Id<"findings">;
+  type: "kill_lead" | "general";
 }
 
 const CATEGORY_STYLE: Record<
@@ -85,13 +90,24 @@ export default function FindingsGrid({
   findings,
   investigationId,
   isLive,
+  directives = [],
 }: {
   findings: Finding[];
   investigationId?: Id<"investigations">;
   isLive?: boolean;
+  directives?: Directive[];
 }) {
   const createDirective = useMutation(api.directives.createDirective);
   const [killedIds, setKilledIds] = useState<Set<string>>(new Set());
+  const [errorId, setErrorId] = useState<string | null>(null);
+
+  // Derive killed status from directives query + optimistic local state
+  const killedFromDirectives = new Set(
+    directives
+      .filter((d) => d.type === "kill_lead" && d.findingId)
+      .map((d) => d.findingId!)
+  );
+  const isKilled = (id: Id<"findings">) => killedIds.has(id) || killedFromDirectives.has(id);
   return (
     <div className="p-4">
       {/* Section header */}
@@ -206,7 +222,7 @@ export default function FindingsGrid({
                     </span>
 
                     {/* Kill Lead button */}
-                    {isLive && investigationId && !killedIds.has(finding._id) && (
+                    {isLive && investigationId && !isKilled(finding._id) && (
                       <button
                         onClick={async () => {
                           try {
@@ -214,11 +230,13 @@ export default function FindingsGrid({
                               investigationId,
                               type: "kill_lead",
                               message: `Stop pursuing lead: ${finding.data.slice(0, 100)}`,
-                              findingId: finding._id as Id<"findings">,
+                              findingId: finding._id,
                             });
                             setKilledIds((prev) => new Set(prev).add(finding._id));
                           } catch (e) {
                             console.error("Failed to kill lead:", e);
+                            setErrorId(finding._id);
+                            setTimeout(() => setErrorId(null), 2000);
                           }
                         }}
                         className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity text-danger/60 hover:text-danger text-[10px] font-mono tracking-wide uppercase cursor-pointer flex items-center gap-1"
@@ -229,9 +247,14 @@ export default function FindingsGrid({
                         Kill Lead
                       </button>
                     )}
-                    {killedIds.has(finding._id) && (
+                    {isKilled(finding._id) && (
                       <span className="ml-auto text-danger/40 text-[10px] font-mono tracking-wide uppercase">
                         Lead killed
+                      </span>
+                    )}
+                    {errorId === finding._id && (
+                      <span className="ml-auto text-danger text-[10px] font-mono tracking-wide">
+                        Failed
                       </span>
                     )}
                   </div>
