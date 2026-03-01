@@ -10,7 +10,7 @@ const MAX_CONSECUTIVE_SAVE_ONLY = 3;
 const COMPRESSION_TOKEN_THRESHOLD = 20_000;
 const KEEP_RECENT_EXCHANGES = 3;
 const MAX_CONSECUTIVE_ERRORS = 3;
-const MAX_BROWSER_ACTIONS = 6;
+const MAX_BROWSER_ACTIONS = Infinity;
 
 function estimateTokens(text: string): number {
   return Math.ceil(text.length / 3.5);
@@ -27,7 +27,7 @@ function buildSystemPrompt(maigretAvailable: boolean, extremeMode: boolean = fal
   }
   if (isEnabled(TOOL_NAMES.BROWSER_ACTION)) {
     toolLines.push(
-      `${n++}. browser_action(instruction) - Control a real browser. Returns page text + visual content descriptions. SLOW (~60-180s) and LIMITED to ${MAX_BROWSER_ACTIONS} uses per investigation. HIGH VALUE for imginn.com (Instagram OSINT), TikTok, and visual platforms — use it to browse profiles, photos, location tags, and connections. See BROWSER RULES below.`
+      `${n++}. browser_action(instruction) - Control a real browser. Returns page text + visual content descriptions. SLOW (~60-180s) but UNLIMITED. HIGH VALUE for imginn.com (Instagram OSINT), TikTok, and visual platforms — use it freely to browse profiles, photos, location tags, and connections. See BROWSER RULES below.`
     );
   }
   if (isEnabled(TOOL_NAMES.WEB_SEARCH)) {
