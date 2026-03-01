@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
@@ -100,6 +100,22 @@ export default function FindingsGrid({
   const createDirective = useMutation(api.directives.createDirective);
   const [killedIds, setKilledIds] = useState<Set<string>>(new Set());
   const [errorId, setErrorId] = useState<string | null>(null);
+  const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+
+  const onImageError = useCallback((id: string) => {
+    setFailedImages((prev) => new Set(prev).add(id));
+  }, []);
+
+  // Close lightbox on Escape key
+  useEffect(() => {
+    if (!lightboxUrl) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setLightboxUrl(null);
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [lightboxUrl]);
 
   // Derive killed status from directives query + optimistic local state
   const killedFromDirectives = new Set(
@@ -181,35 +197,67 @@ export default function FindingsGrid({
                     <ConfidenceBar confidence={finding.confidence} />
                   </div>
 
-                  {/* Data */}
-                  <p className="text-[13px] text-text-primary leading-relaxed">
-                    {finding.data}
-                  </p>
-
-                  {/* Profile URL */}
-                  {finding.profileUrl && (
-                    <a
-                      href={finding.profileUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-[10px] text-accent/70 hover:text-accent mt-1.5 inline-flex items-center gap-1 transition-colors font-mono"
-                    >
-                      <svg
-                        className="w-2.5 h-2.5"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
+                  {/* Body: profile photo + data */}
+                  <div className="flex gap-3">
+                    {/* Profile photo thumbnail */}
+                    {finding.imageUrl && !failedImages.has(finding._id) && (
+                      <button
+                        onClick={() => setLightboxUrl(finding.imageUrl ?? null)}
+                        className="shrink-0 relative group/photo cursor-pointer"
                       >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"
+                        <img
+                          src={finding.imageUrl}
+                          alt=""
+                          referrerPolicy="no-referrer"
+                          onError={() => onImageError(finding._id)}
+                          className="w-14 h-14 rounded-lg object-cover border border-border/60 group-hover/photo:border-accent/40 transition-colors"
                         />
-                      </svg>
-                      {finding.profileUrl}
-                    </a>
-                  )}
+                        <div className="absolute inset-0 rounded-lg bg-black/0 group-hover/photo:bg-black/30 transition-colors flex items-center justify-center">
+                          <svg
+                            className="w-4 h-4 text-white opacity-0 group-hover/photo:opacity-100 transition-opacity drop-shadow-lg"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                            strokeWidth={2}
+                          >
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" />
+                          </svg>
+                        </div>
+                      </button>
+                    )}
+
+                    <div className="flex-1 min-w-0">
+                      {/* Data */}
+                      <p className="text-[13px] text-text-primary leading-relaxed">
+                        {finding.data}
+                      </p>
+
+                      {/* Profile URL */}
+                      {finding.profileUrl && (
+                        <a
+                          href={finding.profileUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[10px] text-accent/70 hover:text-accent mt-1.5 inline-flex items-center gap-1 transition-colors font-mono"
+                        >
+                          <svg
+                            className="w-2.5 h-2.5"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"
+                            />
+                          </svg>
+                          {finding.profileUrl}
+                        </a>
+                      )}
+                    </div>
+                  </div>
 
                   {/* Footer */}
                   <div className="flex items-center gap-3 mt-2 text-[10px] text-text-muted/50 font-mono">
@@ -264,6 +312,40 @@ export default function FindingsGrid({
           </AnimatePresence>
         </div>
       )}
+
+      {/* Lightbox overlay */}
+      <AnimatePresence>
+        {lightboxUrl && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
+            onClick={() => setLightboxUrl(null)}
+          >
+            <motion.img
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              src={lightboxUrl}
+              alt=""
+              referrerPolicy="no-referrer"
+              className="max-w-[90vw] max-h-[85vh] rounded-xl border border-border/60 shadow-2xl object-contain"
+              onClick={(e) => e.stopPropagation()}
+            />
+            <button
+              onClick={() => setLightboxUrl(null)}
+              className="absolute top-6 right-6 w-10 h-10 rounded-full bg-white/10 border border-white/20 flex items-center justify-center text-white hover:bg-white/20 transition-colors cursor-pointer"
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
