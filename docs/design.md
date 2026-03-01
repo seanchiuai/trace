@@ -119,9 +119,6 @@ Consistent pattern across all components:
 
 | Name | Description | Duration | Usage |
 |------|-------------|----------|-------|
-| `bracketSnap` | Scale `1.5→0.95→1` with fade-in | 0.3s | Face detection brackets |
-| `matchReveal` | Slide from `x:100px` with fade-in | 0.3s | Match card entrance |
-| `confidenceGlow` | Box-shadow pulse `5px→25px→5px` | 2s infinite | High confidence elements |
 | `pulse` | Opacity `1→0.4→1` | 2s infinite | Status indicators |
 | `horizontalScan` | Left-to-right sweep across element | 2s infinite | Button hover effect |
 | `float` | Gentle `translateY(0→-6px→0)` | — | Decorative floating elements |
@@ -129,6 +126,15 @@ Consistent pattern across all components:
 | `gridFadeIn` | Opacity `0→0.04` | 2s | Background grid entrance |
 | `dataStream` | Vertical translateY scroll | — | Data visualization |
 | `radarSweep` | Full 360° rotation | — | Radar animation |
+| `vignetteBreath` | Pulsing vignette box-shadow | 4s infinite | Atmospheric effect |
+| `toastGlow` | Toast entrance flash with box-shadow | 0.6s one-shot | Finding toast entrance |
+| `drawCheck` | SVG stroke-dashoffset to 0 | one-shot | Completion check mark |
+| `progressShimmer` | Background-position shimmer | infinite | Progress bar effect |
+| `typewriterCursor` | Border-right color blink | step function | Report typewriter cursor |
+| `stampSlam` | Scale `3→0.9→1.05→1` with rotation | 0.6s one-shot | Completion stamp |
+| `dossierScan` | Top-to-bottom scan line | 3s/8s infinite | Report scan effect |
+| `ringDraw` | SVG stroke-dashoffset ring draw | one-shot | Confidence ring |
+| `redactFlicker` | Opacity flicker `0.06→0.12` | infinite | Redacted text effect |
 
 ### Framer Motion Patterns
 
@@ -156,15 +162,17 @@ Consistent pattern across all components:
 
 ### BrowserView
 - Empty state: concentric ring globe icon, grid background, status dot
-- URL bar: traffic light dots + monospace URL in card-bg pill + "Live" badge
-- Investigating: ping animation on globe ring
+- Active: floating "Live" pill (top-right, `.glass` backdrop) + floating URL label (bottom-left)
+- Investigating (no URL yet): status dot + "Connecting to browser"
+- Planning: globe icon + "Waiting for investigation to initialize..."
 
-### ActivityStream
-- Consistent section header with accent line
-- ToolBadge: 8x8 rounded-lg with tool-specific bg/border/text colors
-- Timeline: `w-px bg-border/60` connecting line between badges
+### ActivityStream (sub-components used by CommandStrip)
+- Exports `CollapsedStep`, `ExpandedStep`, `ToolBadge` sub-components
+- ToolBadge: w-8 h-8 (md) or w-6 h-6 (sm) rounded-lg with tool-specific bg/border/text/letter
+- 9 tools configured: reasoning(R), maigret(M), browser_action(B), web_search(W), save_finding(S), geospy(G), whitepages(P), reverse_image(I), darkweb(D)
+- CollapsedStep: `initial={{ opacity: 0, x: -12 }}`, single-line with tool badge
+- ExpandedStep: `initial={{ opacity: 0, x: -16 }}`, full content with `<details>` result block
 - Step content: 10px tool label + step number + timestamp, 13px action text
-- Collapsible result: bordered pre block with 10px monospace
 
 ### FindingsGrid
 - ConfidenceBar: 12px-wide progress bar + percentage
@@ -186,36 +194,91 @@ Consistent pattern across all components:
 - Report: pre block with 1.8 line-height for readability
 - Evidence: list with confidence color coding, external link icons
 
-### LeadTree
-- Node-style cards with type dot and category color
-- Connection count display
-- Staggered scale entrance animation
+### LeadTree (superseded by RelationshipGraph)
+- Original node-style cards — no longer used on Investigation or Report pages
 
-### ImageGallery
-- Grid with scale hover effect (1.05x)
-- Corner accent brackets appear on hover
-- Backdrop-blur source badges
-- Gradient overlay for captions
+### ImageGallery (superseded by inline gallery in DetectiveReport)
+- Original standalone grid — replaced by `GalleryCard` sub-component in DetectiveReport
+
+### CommandStrip
+- Fixed bottom strip, collapsible/expandable
+- Collapsed: chyron showing latest step summary
+- Expanded: scrollable drawer importing ActivityStream sub-components
+
+### FindingToasts
+- Fixed bottom-right floating notifications
+- New findings trigger animated toasts (slide from right, auto-dismiss 5s)
+- Uses `seenIdsRef` to detect new findings
+- Includes slide-out tray panel with full FindingsGrid
+
+### CompletionFlash
+- Full-screen overlay on investigation completion
+- 2.5-second animation before redirecting to `/report/:id`
+
+### HudHeader
+- Floating fixed header on Investigation page
+- Shows: status badge (with dot + ping), step counter, token usage, cost
+- All pill elements use `.glass` backdrop
+
+### ViewSwitcher
+- Vertical toolbar (fixed left side)
+- Three view buttons: Browser, Graph, Map
+- Pulse indicators when new data available for Graph/Map
+
+### RelationshipGraph
+- Force-directed 2D graph via `react-force-graph-2d`
+- Nodes colored by type: person (accent), profile (blue), location (green), activity (yellow)
+- Click-to-select detail popover
+- Powered by `graphEdges` subscription + `useGraphData` hook
+
+### GeoIntelMap
+- Leaflet map with dark CARTO tiles
+- Custom markers colored by confidence
+- Radius rings showing confidence area
+- Powered by findings with `latitude`/`longitude` fields
+
+### BehavioralProfile
+- Card grid showing behavioral analysis results
+- Sections: timezone estimate, username patterns, predicted handles, interest clusters, behavioral notes
+- Rendered in DetectiveReport
 
 ## Pages
 
 ### Home (`/`)
 - Background: grid overlay (60px), radial glow (top-center), diagonal accent line
-- Header: HUD logo with corner brackets, "Intelligence System" label, status dot
-- Hero: classification badge → 7xl Outfit "Find / anyone." → TypeWriter subtitle
+- Header: HUD logo with corner brackets, "Intelligence System" label, status dot, "All Runs" link
+- Hero: "Autonomous Investigation" label -> 7xl Outfit "Find / anyone." -> TypeWriter subtitle
 - Form: centered InputForm with HUD wrapper
-- Footer: glow-line separator → 10px legal disclaimer
+- Footer: glow-line separator -> 10px legal disclaimer
 
 ### Investigation (`/investigate/:id`)
-- Header: HUD logo, "Subject: {name}", status dot+ping, animated progress bar, step counter
-- Layout: `grid-cols-[1fr_420px]` for desktop
-- Left: BrowserView (full height)
-- Right top: ActivityStream (flex-1, scrollable)
-- Right bottom: FindingsGrid (h-72/h-80, scrollable)
-- Report: slides up from bottom when status="complete"
+- **Layered HUD architecture** (not 2-column grid):
+  - Layer 0: Ambient background (grid overlay + radial glow)
+  - Layer 1: Full-viewport main content view, switched via ViewSwitcher:
+    - **Browser** — BrowserView with live iframe
+    - **Graph** — RelationshipGraph (force-directed 2D)
+    - **Map** — GeoIntelMap (Leaflet with dark tiles)
+  - Layer 2: HudHeader (floating fixed top)
+  - Layer 3: FindingToasts (floating fixed bottom-right)
+  - Layer 4: CommandStrip (collapsible fixed bottom)
+  - Layer 5: CompletionFlash (overlay on completion, redirects to `/report/:id`)
+
+### Report (`/report/:id`)
+- Dossier-style layout with classified header/footer
+- Confidence ring animation
+- 4-column stat grid with staggered entrance
+- Report text with typewriter effect + `leading-[1.8]`
+- Category filter tabs for evidence
+- Image gallery with lightbox
+- BehavioralProfile section
+- Evidence cards with confidence color coding
+
+### Runs (`/runs`)
+- Card grid of all investigations
+- Each card: status badge, confidence bar, time-ago, step/cost metadata
+- HUD corner brackets on cards
 
 ## Responsive
 
-- Mobile: single column stack
-- Desktop (lg+): asymmetric 2-column (wider browser view, narrower right panel at 420px)
-- Demo target: desktop optimized
+- Desktop-optimized (layered HUD is the primary experience)
+- Demo target: desktop
