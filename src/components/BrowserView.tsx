@@ -55,7 +55,7 @@ export default function BrowserView({ liveUrl, status }: BrowserViewProps) {
         src={liveUrl}
         className="flex-1 w-full bg-black"
         title="Browser Use Live View"
-        sandbox="allow-same-origin allow-scripts"
+        sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
       />
     </div>
   );
