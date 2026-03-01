@@ -44,7 +44,7 @@ function buildSystemPrompt(maigretAvailable: boolean): string {
     `  - General → cast a wide net across major platforms`,
     `- Use web_search for simple lookups; reserve browser_action for pages that need interaction`,
     `- Save findings as you go (it's free — doesn't burn steps)`,
-    `- You can call multiple tools at once — do so when actions are independent`,
+    `- PARALLEL TOOL USE: You SHOULD call multiple tools simultaneously whenever the calls are independent. For example, if you want to search for someone on LinkedIn AND check their Twitter, call both web_search tools at the same time — don't wait for one to finish before starting the other. Similarly, combine browser_action with web_search when they target different pages. This dramatically speeds up investigations. Only use sequential calls when one result informs the next.`,
     `- After gathering enough evidence (or nearing 20 steps), call done()`,
   ];
 
