@@ -3,17 +3,47 @@ import { useQuery, useAction } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import { useEffect, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import BrowserView from "../components/BrowserView";
 import ActivityStream from "../components/ActivityStream";
 import FindingsGrid from "../components/FindingsGrid";
 import FaceScan from "../components/FaceScan";
+import DetectiveReport from "../components/DetectiveReport";
 
-const STATUS_LABELS: Record<string, { label: string; color: string }> = {
-  planning: { label: "PLANNING", color: "text-info" },
-  investigating: { label: "INVESTIGATING", color: "text-accent" },
-  analyzing: { label: "ANALYZING", color: "text-warning" },
-  complete: { label: "COMPLETE", color: "text-accent" },
-  failed: { label: "FAILED", color: "text-danger" },
+const STATUS_CONFIG: Record<
+  string,
+  { label: string; color: string; dotColor: string; pulse: boolean }
+> = {
+  planning: {
+    label: "PLANNING",
+    color: "text-info",
+    dotColor: "bg-info",
+    pulse: true,
+  },
+  investigating: {
+    label: "INVESTIGATING",
+    color: "text-accent",
+    dotColor: "bg-accent",
+    pulse: true,
+  },
+  analyzing: {
+    label: "ANALYZING",
+    color: "text-warning",
+    dotColor: "bg-warning",
+    pulse: true,
+  },
+  complete: {
+    label: "COMPLETE",
+    color: "text-accent",
+    dotColor: "bg-accent",
+    pulse: false,
+  },
+  failed: {
+    label: "FAILED",
+    color: "text-danger",
+    dotColor: "bg-danger",
+    pulse: false,
+  },
 };
 
 export default function Investigation() {
@@ -65,7 +95,6 @@ export default function Investigation() {
               })
             ),
           });
-          // Auto-dismiss after 8 seconds
           setTimeout(() => setActiveFaceScan(null), 8000);
         }
       } catch {
@@ -76,100 +105,175 @@ export default function Investigation() {
 
   if (!investigation) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="w-6 h-6 border-2 border-accent/30 border-t-accent rounded-full animate-spin" />
+      <div className="min-h-screen flex items-center justify-center bg-bg-primary">
+        <div className="flex flex-col items-center gap-4">
+          <div className="relative w-12 h-12">
+            <div className="absolute inset-0 border-2 border-accent/20 rounded-full" />
+            <div className="absolute inset-0 border-2 border-transparent border-t-accent rounded-full animate-spin" />
+          </div>
+          <span className="text-[10px] text-text-muted tracking-[0.3em] uppercase font-mono">
+            Loading investigation
+          </span>
+        </div>
       </div>
     );
   }
 
-  const status = STATUS_LABELS[investigation.status] || STATUS_LABELS.planning;
+  const status =
+    STATUS_CONFIG[investigation.status] || STATUS_CONFIG.planning;
+  const progress = Math.min(
+    (investigation.stepCount / 20) * 100,
+    100
+  );
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col bg-bg-primary">
       {/* Header */}
-      <header className="border-b border-border px-6 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <a
-            href="/"
-            className="w-7 h-7 rounded bg-accent/20 flex items-center justify-center text-accent font-bold text-xs"
-          >
-            T
-          </a>
-          <span className="text-sm text-text-secondary">
-            Investigating:{" "}
-            <span className="text-text-primary font-medium">
-              {investigation.targetName}
-            </span>
-          </span>
+      <motion.header
+        initial={{ opacity: 0, y: -8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
+        className="relative border-b border-border px-6 py-0"
+      >
+        <div className="flex items-center h-14">
+          {/* Logo + Target */}
+          <div className="flex items-center gap-3">
+            <a
+              href="/"
+              className="relative w-8 h-8 rounded-lg bg-accent/10 border border-accent/20 flex items-center justify-center group hover:bg-accent/15 transition-colors"
+            >
+              <span className="font-display font-bold text-accent text-xs">
+                T
+              </span>
+              <div className="absolute -top-px -left-px w-2 h-2 border-t border-l border-accent/40" />
+              <div className="absolute -bottom-px -right-px w-2 h-2 border-b border-r border-accent/40" />
+            </a>
+            <div className="h-4 w-px bg-border" />
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] text-text-muted tracking-wider uppercase font-mono">
+                Subject
+              </span>
+              <span className="text-sm text-text-primary font-display font-medium">
+                {investigation.targetName}
+              </span>
+            </div>
+          </div>
+
+          {/* Status + Progress */}
+          <div className="ml-auto flex items-center gap-5">
+            {/* Status badge */}
+            <div className="flex items-center gap-2">
+              <div className="relative">
+                <div
+                  className={`w-2 h-2 rounded-full ${status.dotColor}`}
+                />
+                {status.pulse && (
+                  <div
+                    className={`absolute inset-0 rounded-full ${status.dotColor} animate-ping opacity-40`}
+                  />
+                )}
+              </div>
+              <span
+                className={`text-[10px] font-bold tracking-[0.2em] ${status.color}`}
+              >
+                {status.label}
+              </span>
+            </div>
+
+            {/* Step counter */}
+            <div className="flex items-center gap-2">
+              <div className="w-24 h-1 bg-bg-card rounded-full overflow-hidden">
+                <motion.div
+                  className="h-full bg-accent/60 rounded-full"
+                  initial={{ width: 0 }}
+                  animate={{ width: `${progress}%` }}
+                  transition={{ duration: 0.5, ease: "easeOut" }}
+                />
+              </div>
+              <span className="text-[10px] text-text-muted font-mono tabular-nums">
+                {investigation.stepCount}/20
+              </span>
+            </div>
+          </div>
         </div>
-        <div className="flex items-center gap-4">
-          <span className={`text-xs font-bold tracking-wider ${status.color}`}>
-            {investigation.status === "investigating" && (
-              <span className="inline-block w-2 h-2 bg-accent rounded-full mr-2 animate-pulse" />
-            )}
-            {status.label}
-          </span>
-          <span className="text-xs text-text-muted">
-            Step {investigation.stepCount} / 20
-          </span>
-        </div>
-      </header>
+
+        {/* Bottom glow line */}
+        {status.pulse && (
+          <div
+            className="absolute bottom-0 left-0 right-0 h-px"
+            style={{
+              background:
+                "linear-gradient(90deg, transparent, var(--color-accent) 30%, var(--color-accent) 70%, transparent)",
+              opacity: 0.15,
+            }}
+          />
+        )}
+      </motion.header>
 
       {/* FaceScan overlay */}
-      {activeFaceScan && (
-        <FaceScan
-          imageUrl={activeFaceScan.imageUrl}
-          results={activeFaceScan.results}
-          onDismiss={() => setActiveFaceScan(null)}
-        />
-      )}
+      <AnimatePresence>
+        {activeFaceScan && (
+          <FaceScan
+            imageUrl={activeFaceScan.imageUrl}
+            results={activeFaceScan.results}
+            onDismiss={() => setActiveFaceScan(null)}
+          />
+        )}
+      </AnimatePresence>
 
       {/* Main content */}
-      <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-0">
+      <div className="flex-1 grid grid-cols-1 lg:grid-cols-[1fr_420px] min-h-0">
         {/* Left: Browser view */}
-        <div className="border-r border-border min-h-0">
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.5, delay: 0.1 }}
+          className="border-r border-border min-h-0 relative"
+        >
           <BrowserView
             liveUrl={investigation.browserLiveUrl}
             status={investigation.status}
           />
-        </div>
+        </motion.div>
 
         {/* Right: Activity + Findings */}
-        <div className="flex flex-col min-h-0 overflow-hidden">
+        <motion.div
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.5, delay: 0.2 }}
+          className="flex flex-col min-h-0 overflow-hidden"
+        >
           {/* Activity Stream */}
           <div className="flex-1 overflow-y-auto border-b border-border">
             <ActivityStream steps={steps || []} />
           </div>
 
           {/* Findings */}
-          <div className="h-64 lg:h-80 overflow-y-auto">
+          <div className="h-72 lg:h-80 overflow-y-auto">
             <FindingsGrid findings={findings || []} />
           </div>
-        </div>
+        </motion.div>
       </div>
 
-      {/* Report section (when complete) */}
-      {investigation.status === "complete" && investigation.report && (
-        <div className="border-t border-accent/30 bg-bg-secondary px-6 py-4">
-          <div className="max-w-4xl mx-auto">
-            <div className="flex items-center gap-2 mb-3">
-              <span className="text-accent text-sm font-bold uppercase tracking-wider">
-                Detective Report
-              </span>
-              {investigation.confidence && (
-                <span className="text-xs text-text-muted">
-                  Overall confidence: {investigation.confidence}%
-                </span>
-              )}
-            </div>
-            <div className="prose prose-invert prose-sm max-w-none text-text-secondary">
-              <pre className="whitespace-pre-wrap text-sm font-mono leading-relaxed">
-                {investigation.report}
-              </pre>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Report section */}
+      <AnimatePresence>
+        {investigation.status === "complete" && investigation.report && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.6, ease: "easeOut" }}
+            className="border-t border-accent/20"
+          >
+            <DetectiveReport
+              report={investigation.report}
+              targetName={investigation.targetName}
+              confidence={investigation.confidence}
+              findings={findings || []}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
