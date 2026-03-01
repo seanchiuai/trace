@@ -21,7 +21,16 @@ export const localize = internalAction({
     if (!imgRes.ok) {
       throw new Error(`Failed to download image (${imgRes.status}): ${args.imageUrl}`);
     }
+    const contentType = imgRes.headers.get("content-type") ?? "";
+    if (contentType && !contentType.startsWith("image/")) {
+      throw new Error(
+        `URL returned ${contentType} instead of an image. Pass a direct image URL (ending in .jpg, .png, etc.), not a webpage.`
+      );
+    }
     const arrayBuffer = await imgRes.arrayBuffer();
+    if (arrayBuffer.byteLength === 0) {
+      throw new Error("Downloaded image is empty (0 bytes)");
+    }
     const base64Image = Buffer.from(arrayBuffer).toString("base64");
 
     const res = await fetch("https://picarta.ai/classify", {

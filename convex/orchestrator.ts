@@ -299,7 +299,7 @@ const TOOL_DEFINITIONS = [
     input_schema: {
       type: "object",
       properties: {
-        imageUrl: { type: "string", description: "URL of the image to geo-locate" },
+        imageUrl: { type: "string", description: "Direct URL to an image file (must serve image content, not a webpage). Use the actual image src URL, not the page URL." },
       },
       required: ["imageUrl"],
     },
