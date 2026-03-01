@@ -34,6 +34,7 @@ export default defineSchema({
     createdAt: v.number(),
     completedAt: v.optional(v.number()),
     behavioralAnalysis: v.optional(v.string()),
+    profileReport: v.optional(v.string()),
   }),
 
   findings: defineTable({

@@ -2,7 +2,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useAction } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import BrowserView from "../components/BrowserView";
 import HudHeader from "../components/HudHeader";
@@ -16,6 +16,8 @@ import GeoIntelMap from "../components/GeoIntelMap";
 import ClarificationCard from "../components/ClarificationCard";
 import SteeringInput from "../components/SteeringInput";
 import { useGraphData } from "../hooks/useGraphData";
+import ToolAnimationOverlay from "../components/overlays/ToolAnimationOverlay";
+import { useActiveTool } from "../components/overlays/useActiveTool";
 
 const STATUS_CONFIG: Record<
   string,
@@ -65,6 +67,21 @@ const STATUS_CONFIG: Record<
   },
 };
 
+const VIEW_CONFIG: Record<ViewMode, { label: string; description: string }> = {
+  browser: {
+    label: "Live Browser",
+    description: "Agent viewport with active web automation feed",
+  },
+  graph: {
+    label: "Relationship Graph",
+    description: "Entity links and evidence confidence network",
+  },
+  map: {
+    label: "Geo Intelligence",
+    description: "Location findings with temporal map context",
+  },
+};
+
 export default function Investigation() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -90,8 +107,7 @@ export default function Investigation() {
 
   const edges = useQuery(api.graphEdges.getEdges, { investigationId });
 
-  const [started, setStarted] = useState(false);
-  const [showCompletion, setShowCompletion] = useState(false);
+  const startTriggeredRef = useRef(false);
   const [activeView, setActiveView] = useState<ViewMode>("browser");
 
   const handleStop = async () => {
@@ -104,19 +120,13 @@ export default function Investigation() {
 
   // Auto-start investigation
   useEffect(() => {
-    if (investigation && investigation.status === "planning" && !started) {
-      setStarted(true);
-      startInvestigation({ investigationId });
+    if (investigation?.status === "planning" && !startTriggeredRef.current) {
+      startTriggeredRef.current = true;
+      void startInvestigation({ investigationId });
     }
-  }, [investigation, started, startInvestigation, investigationId]);
+  }, [investigation?.status, startInvestigation, investigationId]);
 
-  // Trigger cinematic completion flash, then redirect to report
-  useEffect(() => {
-    if (investigation?.status === "complete" && investigation.report && !showCompletion) {
-      setShowCompletion(true);
-    }
-  }, [investigation?.status, investigation?.report, showCompletion]);
-
+  const showCompletion = investigation?.status === "complete" && Boolean(investigation.report);
   useEffect(() => {
     if (!showCompletion) return;
     const timer = setTimeout(() => {
@@ -131,6 +141,12 @@ export default function Investigation() {
     edges || [],
     investigation?.targetName || ""
   );
+  const isLive =
+    investigation?.status === "investigating" ||
+    investigation?.status === "planning" ||
+    investigation?.status === "analyzing" ||
+    investigation?.status === "awaiting_input";
+  const { tool: activeTool, stepId: activeStepId } = useActiveTool(steps || [], isLive);
 
   if (!investigation) {
     return (
@@ -154,11 +170,6 @@ export default function Investigation() {
     (investigation.stepCount / 20) * 100,
     100
   );
-  const isLive =
-    investigation.status === "investigating" ||
-    investigation.status === "planning" ||
-    investigation.status === "analyzing" ||
-    investigation.status === "awaiting_input";
 
   const totalTokens =
     (investigation.totalInputTokens ?? 0) +
@@ -182,27 +193,13 @@ export default function Investigation() {
 
   const hasConnections = (edges?.length ?? 0) > 0 || (findings?.some(f => f.category === "connection") ?? false);
   const hasLocations = findings?.some(f => f.category === "location") ?? false;
+  const viewConfig = VIEW_CONFIG[activeView];
 
   return (
-    <div className="h-screen w-screen bg-bg-primary overflow-hidden relative">
-      {/* Layer 0: Ambient background */}
-      <div className="absolute inset-0 z-0">
-        <div
-          className="absolute inset-0 pointer-events-none opacity-30"
-          style={{
-            backgroundImage:
-              "linear-gradient(rgba(0,255,136,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(0,255,136,0.03) 1px, transparent 1px)",
-            backgroundSize: "40px 40px",
-          }}
-        />
-        <div
-          className="absolute inset-0 pointer-events-none"
-          style={{
-            background:
-              "radial-gradient(ellipse at 50% 50%, rgba(0,255,136,0.03) 0%, transparent 60%)",
-          }}
-        />
-      </div>
+    <div className="h-screen w-screen bg-bg-primary overflow-hidden relative investigation-shell">
+      <div className="absolute inset-0 z-0 investigation-aurora" />
+      <div className="absolute inset-0 z-0 investigation-grid" />
+      <div className="absolute inset-0 z-0 investigation-vignette" />
 
       {/* Layer 1: Main content view — isolation prevents iframe from interfering with overlay animations */}
       <motion.div
@@ -212,23 +209,69 @@ export default function Investigation() {
         className="absolute inset-0 z-10 p-3 pt-16 pb-14 sm:p-4 sm:pt-16 sm:pb-14 pl-14"
         style={{ isolation: "isolate", contain: "layout style paint" }}
       >
-        {activeView === "browser" && (
-          <BrowserView
-            liveUrl={investigation.browserLiveUrl}
-            status={investigation.status}
-          />
-        )}
-        {activeView === "graph" && (
-          <div className="h-full w-full rounded-xl overflow-hidden border border-border/30 bg-bg-card/20">
-            <RelationshipGraph nodes={graphData.nodes} links={graphData.links} />
+        <div className="h-full w-full rounded-2xl overflow-hidden relative command-deck">
+          <div className="pointer-events-none absolute inset-0 command-deck-glow" />
+
+          <div className="absolute top-3 left-3 z-20 hidden md:flex items-center gap-3 px-3 py-2 rounded-xl chrome-panel">
+            <span className="text-[10px] text-accent tracking-[0.22em] uppercase font-mono font-semibold">
+              {viewConfig.label}
+            </span>
+            <div className="h-3 w-px bg-white/10" />
+            <span className="text-[10px] text-text-muted font-mono max-w-[26ch] truncate">
+              {viewConfig.description}
+            </span>
           </div>
-        )}
-        {activeView === "map" && (
-          <div className="h-full w-full rounded-xl overflow-hidden border border-border/30 bg-bg-card/20">
-            <GeoIntelMap findings={findings || []} />
+
+          <div className="absolute top-3 right-3 z-20 hidden lg:flex items-center gap-2">
+            <div className="px-2.5 py-1.5 rounded-lg chrome-pill">
+              <span className="text-[9px] text-text-muted tracking-[0.15em] uppercase font-mono">
+                Steps
+              </span>
+              <p className="text-[11px] text-text-primary font-semibold tabular-nums mt-0.5">
+                {investigation.stepCount}
+              </p>
+            </div>
+            <div className="px-2.5 py-1.5 rounded-lg chrome-pill">
+              <span className="text-[9px] text-text-muted tracking-[0.15em] uppercase font-mono">
+                Findings
+              </span>
+              <p className="text-[11px] text-text-primary font-semibold tabular-nums mt-0.5">
+                {findings?.length ?? 0}
+              </p>
+            </div>
+            <div className="px-2.5 py-1.5 rounded-lg chrome-pill">
+              <span className="text-[9px] text-text-muted tracking-[0.15em] uppercase font-mono">
+                Cost
+              </span>
+              <p className="text-[11px] text-text-primary font-semibold tabular-nums mt-0.5">
+                {costDisplay}
+              </p>
+            </div>
           </div>
-        )}
+
+          <div className="absolute inset-0 p-2 sm:p-3">
+            {activeView === "browser" && (
+              <BrowserView
+                liveUrl={investigation.browserLiveUrl}
+                status={investigation.status}
+              />
+            )}
+            {activeView === "graph" && (
+              <div className="h-full w-full rounded-xl overflow-hidden border border-white/10 bg-bg-card/30">
+                <RelationshipGraph nodes={graphData.nodes} links={graphData.links} />
+              </div>
+            )}
+            {activeView === "map" && (
+              <div className="h-full w-full rounded-xl overflow-hidden border border-white/10 bg-bg-card/30">
+                <GeoIntelMap findings={findings || []} />
+              </div>
+            )}
+          </div>
+        </div>
       </motion.div>
+
+      {/* Layer 1.5: Tool animation overlays (above browser, below UI controls) */}
+      <ToolAnimationOverlay activeTool={activeTool} stepId={activeStepId} />
 
       {/* View Switcher toolbar */}
       <div className="absolute left-0 top-0 bottom-0 z-20 flex items-center">

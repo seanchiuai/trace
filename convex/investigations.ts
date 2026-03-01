@@ -251,6 +251,13 @@ export const getStorageUrl = query({
   },
 });
 
+export const resolveStorageUrl = mutation({
+  args: { storageId: v.id("_storage") },
+  handler: async (ctx, args) => {
+    return await ctx.storage.getUrl(args.storageId);
+  },
+});
+
 // ── Clarification mutations/queries ──
 
 export const createClarification = mutation({

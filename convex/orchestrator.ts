@@ -10,7 +10,7 @@ const MAX_CONSECUTIVE_SAVE_ONLY = 3;
 const COMPRESSION_TOKEN_THRESHOLD = 20_000;
 const KEEP_RECENT_EXCHANGES = 3;
 const MAX_CONSECUTIVE_ERRORS = 3;
-const MAX_BROWSER_ACTIONS = 6;
+const MAX_BROWSER_ACTIONS = Infinity;
 
 function estimateTokens(text: string): number {
   return Math.ceil(text.length / 3.5);
@@ -27,7 +27,7 @@ function buildSystemPrompt(maigretAvailable: boolean, extremeMode: boolean = fal
   }
   if (isEnabled(TOOL_NAMES.BROWSER_ACTION)) {
     toolLines.push(
-      `${n++}. browser_action(instruction) - Control a real browser. Returns page text. SLOW (~60-180s) and LIMITED to ${MAX_BROWSER_ACTIONS} uses per investigation. See BROWSER RULES and LOGIN WALL AVOIDANCE below.`
+      `${n++}. browser_action(instruction) - Control a real browser. Returns page text + visual content descriptions. SLOW (~60-180s) but UNLIMITED. HIGH VALUE for imginn.com (Instagram OSINT), TikTok, and visual platforms — use it freely to browse profiles, photos, location tags, and connections. See BROWSER RULES below.`
     );
   }
   if (isEnabled(TOOL_NAMES.WEB_SEARCH)) {
@@ -37,7 +37,7 @@ function buildSystemPrompt(maigretAvailable: boolean, extremeMode: boolean = fal
   }
   if (isEnabled(TOOL_NAMES.GEO_LOCATE)) {
     toolLines.push(
-      `${n++}. geo_locate(imageUrl) - Picarta AI geolocation. Returns coordinates, confidence, EXIF, top-3 predictions.`
+      `${n++}. geo_locate(imageUrl) - Picarta AI geolocation. Returns coordinates, confidence, EXIF, top-3 predictions. CAVEAT: Picarta predictions are rough estimates — treat results with a grain of salt. Only trust high-confidence results (>70%) backed by EXIF data or corroborating evidence. Never state a location as confirmed based on Picarta alone.`
     );
   }
   if (isEnabled(TOOL_NAMES.REVERSE_IMAGE_SEARCH)) {
@@ -63,27 +63,38 @@ function buildSystemPrompt(maigretAvailable: boolean, extremeMode: boolean = fal
 
   return `You are an expert OSINT investigator. You think methodically, follow leads, and build a comprehensive digital footprint.
 
+## CRITICAL RULE — READ FIRST
+If you find an Instagram username or Instagram link at ANY point during this investigation, you MUST use browser_action to browse imginn.com/USERNAME immediately. This is NON-NEGOTIABLE. Do not skip it. Do not just save the link. Do not use web_search instead. OPEN IMGINN AND LOOK AT THEIR PHOTOS. This single action has produced more intelligence than any other tool in past investigations.
+
 ## TOOLS
 ${toolLines.join("\n")}
 
 ## BROWSER RULES - READ CAREFULLY
-browser_action is your LAST RESORT, not your default. Follow this decision tree:
-1. Can web_search answer this? (LinkedIn profiles, GitHub pages, news articles, public pages) -> Use web_search
-2. Does the page require JavaScript rendering, scrolling, or interaction? -> Use browser_action
-3. Did web_search return no useful results AND you need to see the actual page? -> Use browser_action
-4. Did browser_action just fail/timeout? -> NEVER retry browser. Switch to web_search.
+browser_action controls a REAL browser. Use it strategically — it's slow (~60-180s) but extremely powerful for visual intelligence.
 
-NEVER use browser_action for: LinkedIn, GitHub, Facebook public pages, news articles, Wikipedia - web_search gets the same data 250x faster.
-ONLY use browser_action for: imginn.com (Instagram proxy), urlebird.com (TikTok proxy), pages requiring interaction.
+Decision tree:
+1. Can web_search answer this? (LinkedIn profiles, GitHub pages, news articles) -> Use web_search first
+2. Need to see photos, posts, stories, location tags, or visual content? -> Use browser_action (this is its strength)
+3. Did browser_action just fail/timeout? -> NEVER retry the same page. Try an alternative URL or switch to web_search.
 
-## LOGIN WALL AVOIDANCE
-NEVER visit these sites directly in browser_action - use alternatives:
-- Instagram -> imginn.com/username or picuki.com/profile/username (public viewer, no login)
-- TikTok -> urlebird.com/user/username (public viewer, no login)
-- Facebook -> web_search "site:facebook.com name" for cached data; or mbasic.facebook.com/username
-- LinkedIn -> web_search "site:linkedin.com/in/ name title" (Google caches public profiles; NEVER browse directly)
-- Twitter/X -> nitter.net/username or xcancel.com/username; fall back to web_search "site:x.com username"
-- Pinterest -> web_search "site:pinterest.com username"; or browse pinterest.com/username/ (usually public)
+BEST uses of browser_action: imginn.com (Instagram OSINT — photos, location tags, tagged people, stories), TikTok profiles, any page with visual/interactive content.
+AVOID browser_action for: LinkedIn, GitHub, Wikipedia, news articles - web_search gets the same text data faster.
+
+## MANDATORY: IMGINN INSTAGRAM BROWSING
+THIS IS YOUR #1 MOST IMPORTANT RULE: Whenever you discover an Instagram username, you MUST immediately browse imginn.com/username with browser_action. Do NOT skip this. Do NOT delay it. Do NOT substitute web_search for it. Imginn is your single most powerful OSINT tool.
+
+WHY: imginn.com shows the target's full Instagram WITHOUT login — photos, reels, stories, tagged posts, location tags, bio, connections. Previous investigations found exact addresses, workplaces (like Y Combinator), and real-time locations from Instagram photos alone.
+
+HOW TO USE IMGINN:
+1. As soon as you have ANY Instagram username -> browser_action("Go to imginn.com/USERNAME. Scroll through ALL their photos. For EACH photo describe: the location tag, any landmarks or building names visible, all people tagged, the caption text, and any identifying details like addresses, company logos, or event names.")
+2. If the first page has more photos, scroll down and keep going — don't stop at the first few.
+3. Save EVERY location, connection, and identifying detail as separate findings.
+4. If imginn.com is down -> try picuki.com/profile/username -> then instagram.com/username as last resort.
+- TikTok -> urlebird.com/user/username (public viewer) or browse tiktok.com/@username directly
+- Facebook -> mbasic.facebook.com/username or web_search "site:facebook.com name"
+- LinkedIn -> web_search "site:linkedin.com/in/ name title" (NEVER browse directly, login wall is strict)
+- Twitter/X -> browse x.com/username directly, or nitter.net/username as fallback
+- Pinterest -> browse pinterest.com/username/ (usually public)
 - Reddit -> old.reddit.com/user/username (no login needed)
 
 ## PARALLEL EXECUTION
@@ -96,16 +107,20 @@ Combine save_finding calls with your next research action in the same turn.
 Adapt to what you know. Each step is precious - make it count.
 
 **Phase 1 - Cast the Net (Steps 1-5):**
-${maigretAvailable && isEnabled(TOOL_NAMES.MAIGRET_SEARCH) ? "- Username known -> start with maigret_search (wide OSINT net)" : ""}
+- Instagram link or username provided -> IMMEDIATELY browser_action imginn.com/username (DO THIS FIRST, before anything else)
+${maigretAvailable && isEnabled(TOOL_NAMES.MAIGRET_SEARCH) ? "- Username known -> start with maigret_search (wide OSINT net), then IMMEDIATELY browse imginn.com/username" : ""}
 - Name only -> parallel web_search: "Name LinkedIn", "Name Twitter", "Name Instagram", "Name GitHub"
+- ALWAYS search: "Name + Description + Instagram" (e.g. "John Doe San Francisco tech Instagram") — this often finds the exact Instagram profile when a generic name search fails
+- When you find an Instagram username from ANY source -> STOP and browse imginn.com/username before continuing
 - Common name -> add description details (city, job, age) to searches; use ask_user if results are ambiguous
-- Photo available -> parallel: geo_locate + reverse_image_search
+- Photo available -> parallel: geo_locate + reverse_image_search (geo_locate is approximate — corroborate with other evidence before reporting as fact)
 - Links provided -> web_search each link for context
 ${extremeMode && isEnabled(TOOL_NAMES.DARKWEB_SEARCH) ? "- Email/username -> darkweb_search for breach records" : ""}
 
 **Phase 2 - Follow Leads (Steps 6-14):**
 - Cross-reference findings: verify identities across platforms
-- Explore confirmed profiles deeper (web_search first, browser only if needed)
+- Browse confirmed Instagram profiles via imginn.com/username with browser_action — look at photos for locations, landmarks, faces, tagged people, bio links, captions
+- Explore confirmed profiles deeper (web_search for text-heavy sites, browser_action for visual platforms like Instagram)
 - Search for connections between discovered accounts
 - Target demographics: younger -> TikTok/Instagram/Discord; professional -> LinkedIn/GitHub
 
@@ -147,6 +162,12 @@ Before each action, review your previous steps. Do NOT:
 - Search for the same query twice
 - Visit a URL you've already visited
 - Save a finding you've already saved
+
+## MANDATORY TOOL USAGE — NON-NEGOTIABLE
+You MUST use every available tool listed above at least once during the investigation. No exceptions.
+Even if you believe a tool is not relevant to the case, find a creative reason to invoke it — partial results are better than skipping a tool entirely.
+Before calling done(), review the list of tools and confirm you have used each one at least once. If any tool has not been called, use it before wrapping up.
+Tools you MUST use at least once this investigation: ${toolLines.filter(l => !l.includes("save_finding") && !l.includes("ask_user") && !l.includes("done(")).map(l => l.match(/\. (\w+)\(/)?.[1]).filter(Boolean).join(", ")}.
 
 ## CRITICAL RULES
 - Save findings AS you discover them (it's free)
@@ -248,7 +269,7 @@ const TOOL_DEFINITIONS = [
       properties: {
         instruction: {
           type: "string",
-          description: 'What to do in the browser, e.g. "Go to imginn.com/johndoe and describe what you see"',
+          description: 'What to do in the browser, e.g. "Go to imginn.com/johndoe and describe their photos, location tags, bio, and tagged people"',
         },
       },
       required: ["instruction"],
@@ -570,7 +591,7 @@ export const step = internalAction({
         "content-type": "application/json",
       },
       body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
+        model: "claude-opus-4-6",
         max_tokens: 4096,
         system: buildSystemPrompt(maigretAvailable, extremeMode, disabledTools),
         messages: messagesWithContext,
@@ -795,7 +816,7 @@ export const step = internalAction({
         id: args.investigationId,
         inputTokens: compressionTokens.input,
         outputTokens: compressionTokens.output,
-        model: "claude-sonnet-4-20250514",
+        model: "claude-opus-4-6",
       });
     }
 
@@ -936,18 +957,26 @@ async function executeToolCall(
         const picartaResult = await ctx.runAction(internal.tools.picarta.localize, {
           imageUrl: toolCall.args.imageUrl as string,
         });
-        // Auto-save location finding if we got coordinates
+        // Only auto-save if EXIF confirms location OR confidence is very high (>70%)
+        // Picarta is non-deterministic and gives different answers each time for the same image
         if (picartaResult.latitude && picartaResult.longitude) {
           const locationParts = [picartaResult.city, picartaResult.province, picartaResult.country].filter(Boolean);
-          const conf = picartaResult.confidence ? Math.round(picartaResult.confidence * 100) : 60;
-          await ctx.runMutation(api.investigations.addFinding, {
-            investigationId,
-            source: "picarta",
-            category: "location",
-            platform: "picarta",
-            data: `Photo geo-located to ${locationParts.join(", ")} (${picartaResult.latitude}, ${picartaResult.longitude}). Confidence: ${conf}%${picartaResult.exifCountry ? `. EXIF confirms: ${picartaResult.exifCountry}` : ""}`,
-            confidence: conf,
-          });
+          const conf = picartaResult.confidence ? Math.round(picartaResult.confidence * 100) : 0;
+          const hasExif = !!(picartaResult.exifLat && picartaResult.exifLon);
+          if (hasExif || conf >= 70) {
+            await ctx.runMutation(api.investigations.addFinding, {
+              investigationId,
+              source: "picarta",
+              category: "location",
+              platform: "picarta",
+              data: hasExif
+                ? `Photo EXIF confirms location: ${picartaResult.exifCountry ?? locationParts.join(", ")} (${picartaResult.exifLat}, ${picartaResult.exifLon}). AI prediction: ${locationParts.join(", ")} (${conf}% confidence)`
+                : `Photo geo-located to ${locationParts.join(", ")} (${picartaResult.latitude}, ${picartaResult.longitude}). Confidence: ${conf}% — treat as approximate`,
+              confidence: hasExif ? Math.max(conf, 80) : conf,
+              latitude: hasExif ? picartaResult.exifLat : picartaResult.latitude,
+              longitude: hasExif ? picartaResult.exifLon : picartaResult.longitude,
+            });
+          }
         }
         return JSON.stringify(picartaResult);
       }
@@ -1188,7 +1217,7 @@ async function compressHistory(
         "content-type": "application/json",
       },
       body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
+        model: "claude-opus-4-6",
         max_tokens: 1024,
         messages: [{
           role: "user",
@@ -1312,7 +1341,7 @@ async function generateReport(
     method: "POST",
     headers: apiHeaders,
     body: JSON.stringify({
-      model: "claude-opus-4-20250514",
+      model: "claude-opus-4-6",
       max_tokens: 4096,
       messages: [{
         role: "user",
@@ -1344,7 +1373,7 @@ Format as markdown. Be thorough and professional.`,
     method: "POST",
     headers: apiHeaders,
     body: JSON.stringify({
-      model: "claude-sonnet-4-20250514",
+      model: "claude-opus-4-6",
       max_tokens: 2048,
       messages: [{
         role: "user",
@@ -1450,7 +1479,7 @@ Respond with ONLY a valid JSON object (no markdown, no code fences):
           id: investigationId,
           inputTokens: behavioralData.usage.input_tokens ?? 0,
           outputTokens: behavioralData.usage.output_tokens ?? 0,
-          model: "claude-sonnet-4-20250514",
+          model: "claude-opus-4-6",
         });
       }
       const behavioralText = behavioralData.content?.find((b: { type: string }) => b.type === "text")?.text || "";

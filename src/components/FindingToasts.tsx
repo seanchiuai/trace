@@ -102,7 +102,7 @@ export default function FindingToasts({ findings, investigationId, isLive, direc
   return (
     <>
       {/* Toast stack */}
-      <div className="fixed bottom-16 right-5 z-30 flex flex-col-reverse gap-2 max-sm:right-3 max-sm:left-3">
+      <div className="fixed bottom-24 right-5 z-50 flex flex-col-reverse gap-2 max-sm:right-3 max-sm:left-3 pointer-events-none">
         <AnimatePresence>
           {visibleToasts.map((finding) => {
             const dotColor = CATEGORY_DOT[finding.category] || "bg-cyan-400";
@@ -115,7 +115,7 @@ export default function FindingToasts({ findings, investigationId, isLive, direc
                 animate={{ x: 0, opacity: 1, scale: 1 }}
                 exit={{ x: 60, opacity: 0, scale: 0.95 }}
                 transition={{ type: "spring", damping: 25, stiffness: 300 }}
-                className="w-80 max-sm:w-full bg-bg-secondary backdrop-blur-xl border border-white/[0.06] rounded-xl p-3 cursor-pointer hover:border-white/[0.12] transition-colors"
+                className="w-80 max-sm:w-full bg-bg-secondary backdrop-blur-xl border border-white/[0.06] rounded-xl p-3 cursor-pointer hover:border-white/[0.12] transition-colors pointer-events-auto"
                 style={{
                   willChange: "transform",
                   animation: "toastGlow 0.6s ease-out",
@@ -163,7 +163,7 @@ export default function FindingToasts({ findings, investigationId, isLive, direc
       {findings.length > 0 && (
         <button
           onClick={() => setTrayOpen(true)}
-          className={`fixed bottom-16 right-5 z-30 -translate-y-2 items-center gap-1.5 px-3 py-1.5 rounded-full glass-accent hover:bg-accent/[0.08] transition-colors cursor-pointer ${visibleToasts.length > 0 ? "hidden" : "flex"}`}
+          className={`fixed bottom-24 right-5 z-50 items-center gap-1.5 px-3 py-1.5 rounded-full glass-accent hover:bg-accent/[0.08] transition-colors cursor-pointer ${visibleToasts.length > 0 ? "hidden" : "flex"}`}
         >
           <svg className="w-3 h-3 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
@@ -183,7 +183,7 @@ export default function FindingToasts({ findings, investigationId, isLive, direc
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 z-40 bg-black/50"
+              className="fixed inset-0 z-50 bg-black/50"
               onClick={() => setTrayOpen(false)}
             />
 
@@ -193,7 +193,7 @@ export default function FindingToasts({ findings, investigationId, isLive, direc
               animate={{ x: 0 }}
               exit={{ x: "100%" }}
               transition={{ type: "spring", damping: 30, stiffness: 300 }}
-              className="fixed top-0 right-0 bottom-0 z-40 w-[420px] max-w-[90vw] bg-bg-primary/95 backdrop-blur-xl border-l border-white/[0.06] overflow-y-auto"
+              className="fixed top-0 right-0 bottom-0 z-50 w-[420px] max-w-[90vw] bg-bg-primary/95 backdrop-blur-xl border-l border-white/[0.06] overflow-y-auto"
             >
               <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.04] sticky top-0 bg-bg-primary/95 backdrop-blur-xl z-10">
                 <div className="flex items-center gap-2">

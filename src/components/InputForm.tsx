@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { motion, AnimatePresence } from "framer-motion";
@@ -68,6 +68,13 @@ export default function InputForm({ onSubmit, loading }: InputFormProps) {
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const generateUploadUrl = useMutation(api.investigations.generateUploadUrl);
+  const resolveStorageUrl = useMutation(api.investigations.resolveStorageUrl);
+
+  // Camera capture state
+  const [cameraOpen, setCameraOpen] = useState(false);
+  const [cameraError, setCameraError] = useState<string | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
 
   const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
@@ -78,6 +85,61 @@ export default function InputForm({ onSubmit, loading }: InputFormProps) {
     const url = URL.createObjectURL(file);
     setPhotoPreview(url);
   };
+
+  const stopCamera = useCallback(() => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+    }
+    setCameraOpen(false);
+    setCameraError(null);
+  }, []);
+
+  const startCamera = useCallback(async () => {
+    setCameraError(null);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } },
+        audio: false,
+      });
+      streamRef.current = stream;
+      setCameraOpen(true);
+      // Attach stream after state update triggers the video element render
+      requestAnimationFrame(() => {
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+        }
+      });
+    } catch {
+      setCameraError("Camera access denied");
+    }
+  }, []);
+
+  const capturePhoto = useCallback(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.drawImage(video, 0, 0);
+    canvas.toBlob((blob) => {
+      if (!blob) return;
+      const file = new File([blob], `capture-${Date.now()}.jpg`, { type: "image/jpeg" });
+      handlePhotoSelect(file);
+      stopCamera();
+    }, "image/jpeg", 0.92);
+  }, [stopCamera]);
+
+  // Cleanup camera on unmount
+  useEffect(() => {
+    return () => {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((t) => t.stop());
+      }
+    };
+  }, []);
 
   const clearPhoto = () => {
     setPhotoFile(null);
@@ -108,10 +170,8 @@ export default function InputForm({ onSubmit, loading }: InputFormProps) {
           body: photoFile,
         });
         const { storageId } = await res.json();
-        // Construct the serving URL from the Convex deployment
-        const convexUrl = import.meta.env.VITE_CONVEX_URL as string;
-        const siteUrl = convexUrl.replace(".cloud", ".site");
-        targetPhoto = `${siteUrl}/api/storage/${storageId}`;
+        const url = await resolveStorageUrl({ storageId });
+        if (url) targetPhoto = url;
       } catch (err) {
         console.error("Photo upload failed:", err);
       } finally {
@@ -264,30 +324,92 @@ export default function InputForm({ onSubmit, loading }: InputFormProps) {
                   </span>
                 </div>
               </div>
+            ) : cameraOpen ? (
+              /* Camera viewfinder */
+              <div className="relative w-full rounded-lg border border-accent/30 bg-bg-card/50 overflow-hidden">
+                <video
+                  ref={videoRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  className="w-full h-48 object-cover bg-black"
+                />
+                {/* Viewfinder corners */}
+                <div className="absolute inset-4 pointer-events-none">
+                  <div className="absolute top-0 left-0 w-5 h-5 border-t-2 border-l-2 border-accent/60" />
+                  <div className="absolute top-0 right-0 w-5 h-5 border-t-2 border-r-2 border-accent/60" />
+                  <div className="absolute bottom-0 left-0 w-5 h-5 border-b-2 border-l-2 border-accent/60" />
+                  <div className="absolute bottom-0 right-0 w-5 h-5 border-b-2 border-r-2 border-accent/60" />
+                </div>
+                <div className="flex items-center justify-center gap-3 p-3">
+                  <button
+                    type="button"
+                    onClick={stopCamera}
+                    className="px-4 py-2 rounded-lg border border-border bg-bg-primary/80 text-text-muted text-[11px] font-mono tracking-wide hover:border-red-400/40 hover:text-red-400 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={capturePhoto}
+                    className="px-5 py-2 rounded-lg bg-accent/20 border border-accent/40 text-accent text-[11px] font-mono font-bold tracking-wide hover:bg-accent/30 transition-colors"
+                  >
+                    Capture
+                  </button>
+                </div>
+              </div>
             ) : (
-              <div
-                onClick={() => fileInputRef.current?.click()}
-                onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-                onDragLeave={() => setDragOver(false)}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  setDragOver(false);
-                  const file = e.dataTransfer.files[0];
-                  if (file) handlePhotoSelect(file);
-                }}
-                className={`relative w-full px-4 py-8 bg-bg-card/50 border border-dashed rounded-lg text-center cursor-pointer transition-all duration-300 group ${
-                  dragOver
-                    ? "border-accent/50 bg-accent/[0.04] shadow-[0_0_20px_rgba(0,255,136,0.06)]"
-                    : "border-border hover:border-accent/30 hover:bg-bg-card/80"
-                }`}
-              >
-                <div className={`w-10 h-10 mx-auto mb-3 rounded-lg bg-bg-primary border flex items-center justify-center transition-colors ${
-                  dragOver ? "border-accent/30" : "border-border group-hover:border-accent/20"
-                }`}>
+              /* Upload / Camera picker */
+              <div className="space-y-2">
+                <div
+                  onClick={() => fileInputRef.current?.click()}
+                  onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+                  onDragLeave={() => setDragOver(false)}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    setDragOver(false);
+                    const file = e.dataTransfer.files[0];
+                    if (file) handlePhotoSelect(file);
+                  }}
+                  className={`relative w-full px-4 py-6 bg-bg-card/50 border border-dashed rounded-lg text-center cursor-pointer transition-all duration-300 group ${
+                    dragOver
+                      ? "border-accent/50 bg-accent/[0.04] shadow-[0_0_20px_rgba(0,255,136,0.06)]"
+                      : "border-border hover:border-accent/30 hover:bg-bg-card/80"
+                  }`}
+                >
+                  <div className={`w-10 h-10 mx-auto mb-3 rounded-lg bg-bg-primary border flex items-center justify-center transition-colors ${
+                    dragOver ? "border-accent/30" : "border-border group-hover:border-accent/20"
+                  }`}>
+                    <svg
+                      className={`w-5 h-5 transition-colors ${
+                        dragOver ? "text-accent/60" : "text-text-muted group-hover:text-accent/60"
+                      }`}
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={1.5}
+                        d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                      />
+                    </svg>
+                  </div>
+                  <p className="text-text-muted text-xs">
+                    Drag & drop or click to upload
+                  </p>
+                  <p className="text-text-muted/60 text-[10px] mt-1">
+                    Used for geo-location & reverse image search · Max 10MB
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={startCamera}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg border border-border bg-bg-card/50 hover:border-accent/30 hover:bg-bg-card/80 transition-all duration-300 group"
+                >
                   <svg
-                    className={`w-5 h-5 transition-colors ${
-                      dragOver ? "text-accent/60" : "text-text-muted group-hover:text-accent/60"
-                    }`}
+                    className="w-4 h-4 text-text-muted group-hover:text-accent/60 transition-colors"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -296,16 +418,22 @@ export default function InputForm({ onSubmit, loading }: InputFormProps) {
                       strokeLinecap="round"
                       strokeLinejoin="round"
                       strokeWidth={1.5}
-                      d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                      d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z"
+                    />
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={1.5}
+                      d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z"
                     />
                   </svg>
-                </div>
-                <p className="text-text-muted text-xs">
-                  Drag & drop or click to upload
-                </p>
-                <p className="text-text-muted/60 text-[10px] mt-1">
-                  Used for geo-location & reverse image search · Max 10MB
-                </p>
+                  <span className="text-text-muted text-xs group-hover:text-text-secondary transition-colors">
+                    Take a photo
+                  </span>
+                </button>
+                {cameraError && (
+                  <p className="text-[10px] text-red-400/70 text-center font-mono">{cameraError}</p>
+                )}
               </div>
             )}
           </FormField>
