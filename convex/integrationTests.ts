@@ -88,12 +88,20 @@ export const testPicarta = action({
 
     try {
       // Use a well-known public image (Wikipedia Eiffel Tower thumbnail)
+      // Download ourselves and send as base64 — Picarta can't fetch many URLs server-side
       const testUrl =
         "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a8/Tour_Eiffel_Wikimedia_Commons.jpg/256px-Tour_Eiffel_Wikimedia_Commons.jpg";
+      const imgRes = await fetch(testUrl);
+      if (!imgRes.ok) {
+        return { success: false, error: `Failed to download test image (${imgRes.status})` };
+      }
+      const arrayBuffer = await imgRes.arrayBuffer();
+      const base64Image = Buffer.from(arrayBuffer).toString("base64");
+
       const res = await fetch("https://picarta.ai/classify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ TOKEN: apiKey, IMAGE: testUrl, TOP_K: 1 }),
+        body: JSON.stringify({ TOKEN: apiKey, IMAGE: base64Image, TOP_K: 1 }),
       });
       if (!res.ok) {
         const body = await res.text();

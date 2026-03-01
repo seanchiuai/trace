@@ -13,13 +13,21 @@ export const localize = internalAction({
       throw new Error("Invalid image URL: must start with http:// or https://");
     }
 
-    // Picarta accepts URLs directly in the IMAGE field
+    // Download image ourselves and send as base64 — Picarta's server-side
+    // URL fetching fails for many hosts (Wikimedia, social media CDNs, etc.)
+    const imgRes = await fetch(args.imageUrl);
+    if (!imgRes.ok) {
+      throw new Error(`Failed to download image (${imgRes.status}): ${args.imageUrl}`);
+    }
+    const arrayBuffer = await imgRes.arrayBuffer();
+    const base64Image = Buffer.from(arrayBuffer).toString("base64");
+
     const res = await fetch("https://picarta.ai/classify", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         TOKEN: apiKey,
-        IMAGE: args.imageUrl,
+        IMAGE: base64Image,
         TOP_K: 3,
       }),
     });
