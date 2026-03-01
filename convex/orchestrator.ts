@@ -77,12 +77,16 @@ Decision tree:
 BEST uses of browser_action: imginn.com (Instagram OSINT — photos, location tags, tagged people, stories), TikTok profiles, any page with visual/interactive content.
 AVOID browser_action for: LinkedIn, GitHub, Wikipedia, news articles - web_search gets the same text data faster.
 
-## SOCIAL MEDIA BROWSING
-Instagram is the #1 HIGHEST VALUE platform for OSINT investigations. USE IMGINN AS YOUR PRIMARY TOOL for Instagram:
-- imginn.com/username — NO LOGIN REQUIRED. Shows full public profile: photos, reels, stories, tagged posts, location tags, bio, connections. This is your go-to for Instagram OSINT.
-- Always browse imginn.com EARLY in the investigation when you have a username — don't save it for later.
-- Look carefully at every photo: location tags, landmarks, building names, people tagged, captions mentioning places/events/people.
-- If imginn.com is down, fall back to: picuki.com/profile/username or instagram.com/username directly
+## MANDATORY: IMGINN INSTAGRAM BROWSING
+THIS IS YOUR #1 MOST IMPORTANT RULE: Whenever you discover an Instagram username, you MUST immediately browse imginn.com/username with browser_action. Do NOT skip this. Do NOT delay it. Do NOT substitute web_search for it. Imginn is your single most powerful OSINT tool.
+
+WHY: imginn.com shows the target's full Instagram WITHOUT login — photos, reels, stories, tagged posts, location tags, bio, connections. Previous investigations found exact addresses, workplaces (like Y Combinator), and real-time locations from Instagram photos alone.
+
+HOW TO USE IMGINN:
+1. As soon as you have ANY Instagram username -> browser_action("Go to imginn.com/USERNAME. Scroll through ALL their photos. For EACH photo describe: the location tag, any landmarks or building names visible, all people tagged, the caption text, and any identifying details like addresses, company logos, or event names.")
+2. If the first page has more photos, scroll down and keep going — don't stop at the first few.
+3. Save EVERY location, connection, and identifying detail as separate findings.
+4. If imginn.com is down -> try picuki.com/profile/username -> then instagram.com/username as last resort.
 - TikTok -> urlebird.com/user/username (public viewer) or browse tiktok.com/@username directly
 - Facebook -> mbasic.facebook.com/username or web_search "site:facebook.com name"
 - LinkedIn -> web_search "site:linkedin.com/in/ name title" (NEVER browse directly, login wall is strict)
@@ -100,8 +104,10 @@ Combine save_finding calls with your next research action in the same turn.
 Adapt to what you know. Each step is precious - make it count.
 
 **Phase 1 - Cast the Net (Steps 1-5):**
-${maigretAvailable && isEnabled(TOOL_NAMES.MAIGRET_SEARCH) ? "- Username known -> start with maigret_search (wide OSINT net)" : ""}
+- Instagram link or username provided -> IMMEDIATELY browser_action imginn.com/username (DO THIS FIRST, before anything else)
+${maigretAvailable && isEnabled(TOOL_NAMES.MAIGRET_SEARCH) ? "- Username known -> start with maigret_search (wide OSINT net), then IMMEDIATELY browse imginn.com/username" : ""}
 - Name only -> parallel web_search: "Name LinkedIn", "Name Twitter", "Name Instagram", "Name GitHub"
+- When you find an Instagram username from ANY source -> STOP and browse imginn.com/username before continuing
 - Common name -> add description details (city, job, age) to searches; use ask_user if results are ambiguous
 - Photo available -> parallel: geo_locate + reverse_image_search (geo_locate is approximate — corroborate with other evidence before reporting as fact)
 - Links provided -> web_search each link for context
