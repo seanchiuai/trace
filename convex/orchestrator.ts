@@ -26,7 +26,6 @@ function buildSystemPrompt(maigretAvailable: boolean, extremeMode: boolean = fal
   toolLines.push(
     `${n++}. browser_action(instruction) - Control a real browser. Returns page text. SLOW (~60-180s) and LIMITED to ${MAX_BROWSER_ACTIONS} uses per investigation. See BROWSER RULES and LOGIN WALL AVOIDANCE below.`,
     `${n++}. web_search(query, count?) - Fast web search (<1s). Returns titles, URLs, snippets. YOUR DEFAULT TOOL for lookups.`,
-    `${n++}. geospy_predict(imageUrl) - AI photo geolocation. Returns GPS, city, country, visual clue explanation.`,
     `${n++}. geo_locate(imageUrl) - Picarta AI geolocation. Returns coordinates, confidence, EXIF, top-3 predictions.`,
     `${n++}. reverse_image_search(imageUrl) - Find where a photo appears online. Returns visual matches, knowledge graph, OCR text.`
   );
@@ -80,7 +79,7 @@ Adapt to what you know. Each step is precious - make it count.
 ${maigretAvailable ? "- Username known -> start with maigret_search (wide OSINT net)" : ""}
 - Name only -> parallel web_search: "Name LinkedIn", "Name Twitter", "Name Instagram", "Name GitHub"
 - Common name -> add description details (city, job, age) to searches; use ask_user if results are ambiguous
-- Photo available -> parallel: geospy_predict + reverse_image_search
+- Photo available -> parallel: geo_locate + reverse_image_search
 - Links provided -> web_search each link for context
 ${extremeMode ? "- Email/username -> darkweb_search for breach records" : ""}
 
@@ -245,21 +244,6 @@ const TOOL_DEFINITIONS = [
         count: { type: "number", description: "Number of results (default 10, max 20)" },
       },
       required: ["query"],
-    },
-  },
-  {
-    name: "geospy_predict",
-    description:
-      "AI geolocation - upload a photo and get predicted GPS coordinates, city, country, and an explanation of visual clues. Use on any photo that might reveal a location.",
-    input_schema: {
-      type: "object",
-      properties: {
-        imageUrl: {
-          type: "string",
-          description: "URL of the image to geolocate",
-        },
-      },
-      required: ["imageUrl"],
     },
   },
   {
@@ -913,32 +897,6 @@ async function executeToolCall(
           count: toolCall.args.count as number | undefined,
         });
         return JSON.stringify(searchResult);
-      }
-
-      case "geospy_predict": {
-        await ctx.runMutation(api.investigations.addStep, {
-          investigationId,
-          stepNumber,
-          action: `GeoSpy: Geolocating image from ${(toolCall.args.imageUrl as string).slice(0, 100)}`,
-          tool: "geospy",
-        });
-        const geoResult = await ctx.runAction(internal.tools.geoSpy.predict, {
-          imageUrl: toolCall.args.imageUrl as string,
-        });
-        // Auto-save location finding with coordinates
-        if (geoResult.city || geoResult.country) {
-          const locationParts = [geoResult.city, geoResult.state, geoResult.country].filter(Boolean);
-          await ctx.runMutation(api.investigations.addFinding, {
-            investigationId,
-            source: "geospy",
-            category: "location",
-            data: `Photo geolocated to ${locationParts.join(", ")} (${geoResult.latitude}, ${geoResult.longitude}). ${geoResult.explanation || ""}`,
-            confidence: 70,
-            latitude: typeof geoResult.latitude === "number" ? geoResult.latitude : undefined,
-            longitude: typeof geoResult.longitude === "number" ? geoResult.longitude : undefined,
-          });
-        }
-        return JSON.stringify(geoResult);
       }
 
       case "geo_locate": {

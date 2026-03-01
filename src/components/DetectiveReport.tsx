@@ -50,7 +50,7 @@ const TOOL_LABELS: Record<string, string> = {
   browser_action: "Web Recon",
   save_finding: "Intel Logged",
   web_search: "Web Search",
-  geospy: "Photo Geolocation",
+  geo_locate: "Photo Geolocation",
   whitepages: "Person Lookup",
   reverse_image: "Image Search",
   darkweb: "Dark Web Intel",

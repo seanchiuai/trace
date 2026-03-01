@@ -47,7 +47,6 @@ Defined as Anthropic tool schemas in `TOOL_DEFINITIONS`:
 | `maigret_search` | `username` | `internal.tools.maigret.investigate` |
 | `browser_action` | `instruction` | `internal.tools.browserUse.runTask` |
 | `web_search` | `query, count?` | `internal.tools.braveSearch.search` |
-| `geospy_predict` | `imageUrl` | `internal.tools.geoSpy.predict` |
 | `geo_locate` | `imageUrl` | `internal.tools.picarta.localize` |
 | `reverse_image_search` | `imageUrl` | `internal.tools.reverseImageSearch.search` |
 | `whitepages_lookup` | `name?, phone?, city?, stateCode?` | `internal.tools.whitePages.findPerson` (extreme mode) |
@@ -146,6 +145,5 @@ Triggered by the `done` tool or when `stepCount >= MAX_STEPS`:
 | `convex/tools/browserUse.ts` | `runTask`, `getSession`, `stopSession` |
 | `convex/tools/maigret.ts` | `search`, `investigate`, `healthCheck` |
 | `convex/tools/braveSearch.ts` | `search` |
-| `convex/tools/geoSpy.ts` | `predict` |
 | `convex/tools/picarta.ts` | `localize` |
 | `convex/tools/reverseImageSearch.ts` | `search` |
