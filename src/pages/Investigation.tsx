@@ -96,6 +96,13 @@ export default function Investigation() {
     return () => clearTimeout(timer);
   }, [showCompletion, id, navigate]);
 
+  // All hooks must be called before any early return
+  const graphData = useGraphData(
+    findings || [],
+    edges || [],
+    investigation?.targetName || ""
+  );
+
   if (!investigation) {
     return (
       <div className="h-screen w-screen flex items-center justify-center bg-bg-primary">
@@ -142,12 +149,6 @@ export default function Investigation() {
           findings.reduce((sum, f) => sum + f.confidence, 0) / findings.length
         )
       : 0;
-
-  const graphData = useGraphData(
-    findings || [],
-    edges || [],
-    investigation?.targetName || ""
-  );
 
   const hasConnections = (edges?.length ?? 0) > 0 || (findings?.some(f => f.category === "connection") ?? false);
   const hasLocations = findings?.some(f => f.category === "location") ?? false;
