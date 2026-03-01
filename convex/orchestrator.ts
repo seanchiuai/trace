@@ -9,7 +9,7 @@ const SYSTEM_PROMPT = `You are an expert missing persons investigator. Your miss
 
 You have access to these tools:
 1. maigret_search(username) — Intelligent OSINT: searches 3,000+ sites for the username, extracts connected handles from profile bios/metadata, and follows those leads automatically. Returns profiles, leads, and a connection graph. Use this FIRST to cast a wide net.
-2. browser_action(instruction) — Control a web browser. Give clear instructions like "Go to instagram.com/username and look for location tags, check-ins, or geo-tagged posts." Returns page text.
+2. browser_action(instruction) — Control a web browser. Give clear instructions like "Go to imginn.com/username and look for location tags, check-ins, or geo-tagged posts." IMPORTANT: For Instagram profiles, ALWAYS use imginn.com (e.g. imginn.com/username) instead of instagram.com — it shows public profiles without login walls. Returns page text.
 3. face_check(imageUrl) — Run facial recognition on an image. Returns matching profiles. Use on profile pictures to find alternate accounts.
 4. save_finding(source, category, platform, data, confidence) — Save a confirmed finding. Categories: "social", "connection", "location", "activity", "identity". SAVE IMMEDIATELY when you find location data — don't wait.
 5. done(report) — End the investigation and generate the final report.
@@ -24,7 +24,7 @@ PRIORITY: LOCATION DATA IS KING
 Strategy — BREADTH FIRST, then targeted depth:
 1. START: Run maigret_search on the primary username to discover all accounts
 2. TRIAGE: From the results, mentally rank leads by location-relevance:
-   - HIGH: Platforms with geo-data (Instagram, Facebook, Snapchat, Strava, Swarm/Foursquare)
+   - HIGH: Platforms with geo-data (Instagram via imginn.com, Facebook, Snapchat, Strava, Swarm/Foursquare)
    - MEDIUM: Platforms with activity timestamps (Twitter/X, Telegram, Discord)
    - LOW: Code/professional platforms (GitHub, LinkedIn) — check briefly for city/employer only
 3. DRILL: Browse the HIGH-priority profiles first. Look for:
@@ -70,7 +70,7 @@ const TOOLS_SCHEMA = [
         instruction: {
           type: "string",
           description:
-            'What to do in the browser, e.g. "Go to instagram.com/johndoe and describe what you see"',
+            'What to do in the browser, e.g. "Go to imginn.com/johndoe and describe what you see"',
         },
       },
       required: ["instruction"],
@@ -152,7 +152,7 @@ interface ToolCall {
 // --- Helpers ---
 
 const TOOL_TIMEOUTS: Record<string, number> = {
-  browser_action: 90_000,
+  browser_action: 330_000, // 5.5 min — polling runs up to 5 min + overhead
   maigret_search: 130_000,
   face_check: 30_000,
   save_finding: 30_000,
@@ -305,24 +305,6 @@ export const startInvestigation = action({
       id: args.investigationId,
       status: "investigating",
     });
-
-    // Eagerly create a browser session so the live URL appears in the UI immediately.
-    // Non-blocking: if this fails, runTask will auto-create a session later.
-    try {
-      const session = await ctx.runAction(
-        internal.tools.browserUse.createSession,
-        {}
-      );
-      if (session?.id && session?.liveUrl) {
-        await ctx.runMutation(api.investigations.updateBrowserSession, {
-          id: args.investigationId,
-          browserSessionId: session.id,
-          browserLiveUrl: session.liveUrl,
-        });
-      }
-    } catch (e) {
-      console.warn("Eager browser session creation failed (non-blocking):", e);
-    }
 
     // Start the orchestrator loop
     await ctx.scheduler.runAfter(0, internal.orchestrator.step, {
@@ -485,6 +467,7 @@ export const step = internalAction({
                 {
                   task: tc.args.instruction as string,
                   sessionId: investigation.browserSessionId ?? undefined,
+                  investigationId: args.investigationId,
                 },
               ),
               "browser_action",
@@ -492,25 +475,13 @@ export const step = internalAction({
             // Use the task output text as the tool result for the LLM
             toolResult = browserResult?.output ?? JSON.stringify(browserResult);
 
-            // If we didn't have a session before, fetch session details for liveUrl
-            if (!investigation.browserSessionId && browserResult?.sessionId) {
-              try {
-                const session = await ctx.runAction(
-                  internal.tools.browserUse.getSession,
-                  { sessionId: browserResult.sessionId }
-                );
-                await ctx.runMutation(api.investigations.updateBrowserSession, {
-                  id: args.investigationId,
-                  browserSessionId: browserResult.sessionId,
-                  browserLiveUrl: session?.liveUrl,
-                });
-              } catch {
-                // Best-effort: store session_id even without liveUrl
-                await ctx.runMutation(api.investigations.updateBrowserSession, {
-                  id: args.investigationId,
-                  browserSessionId: browserResult.sessionId,
-                });
-              }
+            // v3: runTask returns sessionId + liveUrl directly — always update
+            if (browserResult?.sessionId) {
+              await ctx.runMutation(api.investigations.updateBrowserSession, {
+                id: args.investigationId,
+                browserSessionId: browserResult.sessionId,
+                browserLiveUrl: browserResult.liveUrl,
+              });
             }
             break;
           }
