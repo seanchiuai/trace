@@ -68,6 +68,7 @@ export default function InputForm({ onSubmit, loading }: InputFormProps) {
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const generateUploadUrl = useMutation(api.investigations.generateUploadUrl);
+  const resolveStorageUrl = useMutation(api.investigations.resolveStorageUrl);
 
   const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
@@ -108,10 +109,8 @@ export default function InputForm({ onSubmit, loading }: InputFormProps) {
           body: photoFile,
         });
         const { storageId } = await res.json();
-        // Construct the serving URL from the Convex deployment
-        const convexUrl = import.meta.env.VITE_CONVEX_URL as string;
-        const siteUrl = convexUrl.replace(".cloud", ".site");
-        targetPhoto = `${siteUrl}/api/storage/${storageId}`;
+        const url = await resolveStorageUrl({ storageId });
+        if (url) targetPhoto = url;
       } catch (err) {
         console.error("Photo upload failed:", err);
       } finally {
