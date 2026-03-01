@@ -35,3 +35,8 @@ sidecar/.venv
 *.njsproj
 *.sln
 *.sw?
+
+# Claude
+.claude/*
+!.claude/skills/
+!.claude/skills/**
