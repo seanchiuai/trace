@@ -77,3 +77,6 @@ Convex dashboard (Settings → Environment Variables):
 - Orchestrator max 20 steps per investigation
 - Maigret runs as a separate Python process, not in Node
 - Legal disclaimer required on landing page
+
+
+Rule #1: always make commits after every code change.
