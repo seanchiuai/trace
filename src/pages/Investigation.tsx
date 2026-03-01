@@ -204,12 +204,13 @@ export default function Investigation() {
         />
       </div>
 
-      {/* Layer 1: Main content view */}
+      {/* Layer 1: Main content view — isolation prevents iframe from interfering with overlay animations */}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.6, delay: 0.1 }}
         className="absolute inset-0 z-10 p-3 pt-16 pb-14 sm:p-4 sm:pt-16 sm:pb-14 pl-14"
+        style={{ isolation: "isolate", contain: "layout style paint" }}
       >
         {activeView === "browser" && (
           <BrowserView
