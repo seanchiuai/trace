@@ -195,12 +195,77 @@ export default function InputForm({ onSubmit, loading }: InputFormProps) {
           </FormField>
         </div>
 
-        {/* Integrations section */}
+        {/* Extreme Mode toggle */}
         <motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: 0.38 }}
           className="mt-6"
+        >
+          <button
+            type="button"
+            onClick={() => {
+              setExtremeMode((prev) => {
+                if (prev) {
+                  // Turning off: clear extreme tools from disabled set
+                  setDisabledTools((dt) => {
+                    const next = new Set(dt);
+                    EXTREME_TOOLS.forEach((t) => next.delete(t.name));
+                    return next;
+                  });
+                }
+                return !prev;
+              });
+            }}
+            className={`w-full flex items-center justify-between px-4 py-3 rounded-lg border transition-all duration-300 ${
+              extremeMode
+                ? "border-red-500/50 bg-red-500/5 shadow-[0_0_20px_rgba(239,68,68,0.08)]"
+                : "border-border hover:border-border-bright bg-bg-card/50"
+            }`}
+          >
+            <div className="flex flex-col items-start gap-0.5">
+              <span
+                className={`text-[10px] font-mono font-bold tracking-[0.2em] uppercase ${
+                  extremeMode ? "text-red-400" : "text-text-muted"
+                }`}
+              >
+                EXTREME MODE
+              </span>
+              <span className="text-[10px] text-text-muted/70">
+                Enables WhitePages deep lookup & dark web search (leaked data, breach records)
+              </span>
+            </div>
+            <div
+              className={`relative w-10 h-5 rounded-full transition-colors duration-300 ${
+                extremeMode ? "bg-red-500/30" : "bg-bg-primary"
+              } border ${extremeMode ? "border-red-500/50" : "border-border"}`}
+            >
+              <div
+                className={`absolute top-0.5 w-4 h-4 rounded-full transition-all duration-300 ${
+                  extremeMode
+                    ? "left-[calc(100%-18px)] bg-red-400 shadow-[0_0_8px_rgba(239,68,68,0.5)]"
+                    : "left-0.5 bg-text-muted/40"
+                }`}
+              />
+            </div>
+          </button>
+          {extremeMode && (
+            <motion.p
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              className="text-[10px] text-red-400/70 mt-2 px-1 font-mono"
+            >
+              Warning: Extreme mode accesses private data sources and leaked databases. Use responsibly.
+            </motion.p>
+          )}
+        </motion.div>
+
+        {/* Integrations section */}
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.4 }}
+          className="mt-4"
         >
           <button
             type="button"
@@ -281,71 +346,6 @@ export default function InputForm({ onSubmit, loading }: InputFormProps) {
             </motion.div>
           )}
           </AnimatePresence>
-        </motion.div>
-
-        {/* Extreme Mode toggle */}
-        <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, delay: 0.4 }}
-          className="mt-4"
-        >
-          <button
-            type="button"
-            onClick={() => {
-              setExtremeMode((prev) => {
-                if (prev) {
-                  // Turning off: clear extreme tools from disabled set
-                  setDisabledTools((dt) => {
-                    const next = new Set(dt);
-                    EXTREME_TOOLS.forEach((t) => next.delete(t.name));
-                    return next;
-                  });
-                }
-                return !prev;
-              });
-            }}
-            className={`w-full flex items-center justify-between px-4 py-3 rounded-lg border transition-all duration-300 ${
-              extremeMode
-                ? "border-red-500/50 bg-red-500/5 shadow-[0_0_20px_rgba(239,68,68,0.08)]"
-                : "border-border hover:border-border-bright bg-bg-card/50"
-            }`}
-          >
-            <div className="flex flex-col items-start gap-0.5">
-              <span
-                className={`text-[10px] font-mono font-bold tracking-[0.2em] uppercase ${
-                  extremeMode ? "text-red-400" : "text-text-muted"
-                }`}
-              >
-                EXTREME MODE
-              </span>
-              <span className="text-[10px] text-text-muted/70">
-                Enables WhitePages deep lookup & dark web search (leaked data, breach records)
-              </span>
-            </div>
-            <div
-              className={`relative w-10 h-5 rounded-full transition-colors duration-300 ${
-                extremeMode ? "bg-red-500/30" : "bg-bg-primary"
-              } border ${extremeMode ? "border-red-500/50" : "border-border"}`}
-            >
-              <div
-                className={`absolute top-0.5 w-4 h-4 rounded-full transition-all duration-300 ${
-                  extremeMode
-                    ? "left-[calc(100%-18px)] bg-red-400 shadow-[0_0_8px_rgba(239,68,68,0.5)]"
-                    : "left-0.5 bg-text-muted/40"
-                }`}
-              />
-            </div>
-          </button>
-          {extremeMode && (
-            <motion.p
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              className="text-[10px] text-red-400/70 mt-2 px-1 font-mono"
-            >
-              Warning: Extreme mode accesses private data sources and leaked databases. Use responsibly.
-            </motion.p>
-          )}
         </motion.div>
 
         {/* Submit button */}
