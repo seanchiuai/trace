@@ -1,7 +1,7 @@
 import { useParams } from "react-router-dom";
 import { useQuery, useAction } from "convex/react";
 import { api } from "../../convex/_generated/api";
-import { Id } from "../../convex/_generated/dataModel";
+import type { Id } from "../../convex/_generated/dataModel";
 import { useEffect, useState } from "react";
 import BrowserView from "../components/BrowserView";
 import ActivityStream from "../components/ActivityStream";
