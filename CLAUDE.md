@@ -49,6 +49,7 @@ convex/
 ├── orchestrator.ts      # Opus agentic loop (think → tool → execute → next)
 ├── reports.ts           # Report assembly
 └── tools/
+    ├── braveSearch.ts   # Brave Search API (fast web lookups)
     ├── browserUse.ts    # Browser Use Cloud API
     ├── faceCheck.ts     # FaceCheck.id
     └── maigret.ts       # Calls sidecar
@@ -66,6 +67,7 @@ Convex dashboard (Settings → Environment Variables):
 - `ANTHROPIC_API_KEY` — Claude API key for orchestrator
 - `BROWSER_USE_API_KEY` — Browser Use Cloud API key
 - `FACECHECK_API_KEY` — FaceCheck.id API key
+- `BRAVE_API_KEY` — Brave Search API key (for fast web lookups)
 - `MAIGRET_SIDECAR_URL` — Maigret sidecar URL (optional, defaults to `http://localhost:8000`)
 
 ## Boundaries
