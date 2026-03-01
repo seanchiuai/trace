@@ -404,13 +404,13 @@ export const step = internalAction({
     }
 
     const parallelResults = await Promise.allSettled(parallelPromises);
-    for (const r of parallelResults) {
+    parallelResults.forEach((r, i) => {
       if (r.status === "fulfilled") {
         toolResults.push(r.value);
       } else {
-        toolResults.push({ id: "error", tool: "unknown", result: `Tool error: ${r.reason}` });
+        toolResults.push({ id: parallelCalls[i].id, tool: parallelCalls[i].tool, result: `Tool error: ${r.reason}` });
       }
-    }
+    });
     toolResults.push(...browserResults);
 
     // Re-order to match original toolCalls order for correct tool_result mapping
