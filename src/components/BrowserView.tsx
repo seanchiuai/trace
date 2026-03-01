@@ -56,10 +56,12 @@ export default function BrowserView({ liveUrl, status }: BrowserViewProps) {
           <p className="text-text-muted text-xs max-w-xs leading-relaxed mx-auto">
             {status === "planning"
               ? "Waiting for investigation to initialize..."
-              : "The live browser session will appear here when the agent starts browsing the web."}
+              : status === "complete" || status === "failed" || status === "stopped"
+              ? "No browser session was used in this investigation."
+              : "The agent will open a browser when it needs to interact with a website. Most lookups use faster tools first."}
           </p>
 
-          {status === "investigating" && (
+          {(status === "investigating" || status === "awaiting_input") && (
             <motion.div
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
@@ -67,8 +69,8 @@ export default function BrowserView({ liveUrl, status }: BrowserViewProps) {
               className="mt-8 flex items-center justify-center gap-2"
             >
               <div className="status-dot" />
-              <span className="text-[10px] text-accent tracking-[0.2em] uppercase font-mono">
-                Connecting to browser
+              <span className="text-[10px] text-text-muted tracking-[0.2em] uppercase font-mono">
+                Standby — waiting for browser action
               </span>
             </motion.div>
           )}
