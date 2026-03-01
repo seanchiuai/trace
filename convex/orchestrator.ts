@@ -8,6 +8,8 @@ const MAX_STEPS = 20;
 const MAX_CONSECUTIVE_SAVE_ONLY = 3;
 const COMPRESSION_TOKEN_THRESHOLD = 20_000;
 const KEEP_RECENT_EXCHANGES = 3;
+const MAX_CONSECUTIVE_ERRORS = 3;
+const MAX_BROWSER_ACTIONS = 6;
 
 function estimateTokens(text: string): number {
   return Math.ceil(text.length / 3.5);
@@ -18,60 +20,162 @@ function buildSystemPrompt(maigretAvailable: boolean, extremeMode: boolean = fal
   let n = 1;
   if (maigretAvailable) {
     toolLines.push(
-      `${n++}. maigret_search(username) — Intelligent OSINT: searches 3,000+ sites for the username, then an AI reads all profile bios/metadata to extract REAL connected handles (e.g. "X: @handle" in a Telegram bio, GitHub profile linking to Twitter, etc.), and automatically searches those leads too. Returns primary profiles, AI-extracted leads with reasoning, lead search results, and a connection graph. One call gives you a deep web of connected accounts — not just the primary username.`
+      `${n++}. maigret_search(username) — OSINT search across 3,000+ sites. AI extracts connected handles from bios/metadata and auto-searches those leads. Returns profiles, leads, connection graph. High-value first move when you have a username.`
     );
   }
   toolLines.push(
-    `${n++}. browser_action(instruction) — Control a web browser. Give clear instructions like "Go to imginn.com/username and report what you see." IMPORTANT: For Instagram profiles, ALWAYS use imginn.com (e.g. imginn.com/username) instead of instagram.com — it shows public profiles without login walls. Returns screenshots and page text. Use for interactive pages that require scrolling or JS rendering. EXPENSIVE — prefer web_search for simple lookups.`,
-    `${n++}. web_search(query, count?) — Fast web search. Returns titles, URLs, and snippets. Use this FIRST for simple lookups like "John Smith LinkedIn", "username site:twitter.com", company info, news articles, etc. Much faster and cheaper than browser_action.`,
-    `${n++}. geospy_predict(imageUrl) — AI photo geolocation. Upload a photo URL and get predicted GPS coordinates, city, country, and an explanation of the visual clues used. Use on any image that might reveal a location (street views, landmarks, scenery).`,
-    `${n++}. geo_locate(imageUrl) — AI geolocation via Picarta: analyzes an image and predicts WHERE it was taken (city, state, country, GPS coordinates) based on visual clues. Returns coordinates, confidence score, EXIF metadata, and top-3 predictions. Use on any photo with visible backgrounds, landmarks, or architecture.`,
-    `${n++}. reverse_image_search(imageUrl) — Reverse image search. Find where a photo appears online — social profiles, news articles, blogs. Returns visual matches, knowledge graph identity, and text in the image.`
+    `${n++}. browser_action(instruction) — Control a real browser. Returns page text. For Instagram, use imginn.com/username. SLOW (~60-180s) and LIMITED to ${MAX_BROWSER_ACTIONS} uses per investigation. See BROWSER RULES below.`,
+    `${n++}. web_search(query, count?) — Fast web search (<1s). Returns titles, URLs, snippets. YOUR DEFAULT TOOL for lookups.`,
+    `${n++}. geospy_predict(imageUrl) — AI photo geolocation. Returns GPS, city, country, visual clue explanation.`,
+    `${n++}. geo_locate(imageUrl) — Picarta AI geolocation. Returns coordinates, confidence, EXIF, top-3 predictions.`,
+    `${n++}. reverse_image_search(imageUrl) — Find where a photo appears online. Returns visual matches, knowledge graph, OCR text.`
   );
   if (extremeMode) {
     toolLines.push(
-      `${n++}. whitepages_lookup(name?, phone?, city?, stateCode?) — Deep person lookup using WhitePages. Search by name, phone number, or both. Returns real addresses (with lat/lng), age range, phone numbers, and associated people. Use when you have a name or phone number and need real-world identity data.`,
-      `${n++}. darkweb_search(term, maxResults?) — Search dark web, leaked databases, and paste sites. Find breach records, leaked credentials, and data dump mentions for an email, username, phone, or domain. Use to uncover hidden connections or verify identities.`
+      `${n++}. whitepages_lookup(name?, phone?, city?, stateCode?) — Deep person lookup. Returns addresses, age, phones, associates.`,
+      `${n++}. darkweb_search(term, maxResults?) — Search leaked databases and paste sites for emails, usernames, phones.`
     );
   }
   toolLines.push(
-    `${n++}. save_finding(source, category, platform, data, confidence, imageUrl?, profileUrl?) — Save a confirmed finding. Categories: "social", "connection", "location", "activity", "identity". FREE — does not count toward your step budget. Save findings liberally as you discover them. IMPORTANT: When you find profile photos, post images, or any visual evidence, ALWAYS include the imageUrl. On imginn.com, image URLs look like "https://imginn.com/p/..." or CDN URLs from the page.`,
-    `${n++}. done(report) — End the investigation and generate the final report.`
+    `${n++}. save_finding(source, category, platform, data, confidence, imageUrl?, profileUrl?) — Save a confirmed finding. Categories: "social", "connection", "location", "activity", "identity". FREE — does not count toward your step budget. Save liberally. Always include imageUrl when you have one.`,
+    `${n++}. done(summary) — End the investigation. Call this when you've gathered enough evidence or are running low on steps.`
   );
 
-  const strategyBullets: string[] = [
-    `- Look at the available info summary to decide your first move:`,
-    ...(maigretAvailable
-      ? [`  - Username known → start with maigret_search to cast a wide OSINT net`]
-      : []),
-    `  - Only a name → use web_search to find usernames, profiles, and leads first`,
-    `  - Photo available → use geospy_predict to geolocate the photo; use reverse_image_search to find where it appears online`,
-    `  - Social links provided → explore those profiles directly (web_search or browser_action)`,
-    `  - Phone number → search it via web_search${extremeMode ? "; also use whitepages_lookup for deep identity data" : ""}`,
-    ...(extremeMode
-      ? [`  - Email/username known → use darkweb_search to check for leaked records, breach data, and paste site mentions`]
-      : []),
-    `- Consider the target type and pick platforms accordingly:`,
-    `  - Younger person → prioritize TikTok, Instagram, Snapchat, Discord`,
-    `  - Professional → prioritize LinkedIn, GitHub, company pages`,
-    `  - Founder/entrepreneur → check Crunchbase, AngelList, press coverage`,
-    `  - General → cast a wide net across major platforms`,
-    `- When you find photos with visible backgrounds (buildings, streets, landscapes), run geo_locate to predict GPS location`,
-    `- Use web_search for simple lookups; reserve browser_action for pages that need interaction`,
-    `- Save findings as you go (it's free — doesn't burn steps)`,
-    `<use_parallel_tool_calls>\nFor maximum efficiency, whenever you perform multiple independent operations, invoke all relevant tools simultaneously rather than sequentially.\nPrioritize calling tools in parallel whenever possible.\n</use_parallel_tool_calls>`,
-    `- After gathering enough evidence (or nearing 20 steps), call done()`,
-  ];
+  return `You are an expert OSINT investigator. You think methodically, follow leads, and build a comprehensive digital footprint.
 
-  return `You are an expert missing persons investigator. You think methodically, follow leads, and build a comprehensive picture of a person's digital footprint.
-
-You have access to these tools:
+## TOOLS
 ${toolLines.join("\n")}
 
-Strategy — ADAPT to what you know:
-${strategyBullets.join("\n")}
+## BROWSER RULES — READ CAREFULLY
+browser_action is your LAST RESORT, not your default. Follow this decision tree:
+1. Can web_search answer this? (LinkedIn profiles, GitHub pages, news articles, public pages) → Use web_search
+2. Does the page require JavaScript rendering, scrolling, or interaction? → Use browser_action
+3. Did web_search return no useful results AND you need to see the actual page? → Use browser_action
+4. Did browser_action just fail/timeout? → NEVER retry browser. Switch to web_search.
 
-Always explain your reasoning before choosing an action. Be thorough but efficient.`;
+NEVER use browser_action for: LinkedIn, GitHub, Facebook public pages, news articles, Wikipedia — web_search gets the same data 250x faster.
+ONLY use browser_action for: imginn.com (Instagram proxy), pages requiring login-wall bypass, interactive content.
+
+## PARALLEL EXECUTION
+<use_parallel_tool_calls>
+ALWAYS invoke independent tools simultaneously. If you need 3 web searches, call all 3 at once — not one at a time.
+Combine save_finding calls with your next research action in the same turn.
+</use_parallel_tool_calls>
+
+## STRATEGY — PHASE-BASED APPROACH
+Adapt to what you know. Each step is precious — make it count.
+
+**Phase 1 — Cast the Net (Steps 1-5):**
+${maigretAvailable ? "- Username known → start with maigret_search (wide OSINT net)" : ""}
+- Name only → parallel web_search: "Name LinkedIn", "Name Twitter", "Name Instagram", "Name GitHub"
+- Photo available → parallel: geospy_predict + reverse_image_search
+- Links provided → web_search each link for context
+${extremeMode ? "- Email/username → darkweb_search for breach records" : ""}
+
+**Phase 2 — Follow Leads (Steps 6-14):**
+- Cross-reference findings: verify identities across platforms
+- Explore confirmed profiles deeper (web_search first, browser only if needed)
+- Search for connections between discovered accounts
+- Target demographics: younger → TikTok/Instagram/Discord; professional → LinkedIn/GitHub
+
+**Phase 3 — Verify & Wrap Up (Steps 15-20):**
+- Verify uncertain findings, fill gaps in the profile
+- Ensure all confirmed findings are saved
+- Call done() with a comprehensive summary
+
+## ERROR RECOVERY
+- If a tool returns an error, DO NOT retry the same tool with the same input
+- If browser_action fails → switch to web_search for that URL/query
+- If web_search returns empty → try different query terms, not browser_action
+- After 2+ consecutive errors, reassess your approach entirely
+
+## DEDUPLICATION
+Before each action, review your previous steps. Do NOT:
+- Search for the same query twice
+- Visit a URL you've already visited
+- Save a finding you've already saved
+
+## CRITICAL RULES
+- Save findings AS you discover them (it's free)
+- When you find images, ALWAYS include imageUrl in save_finding
+- Explain your reasoning briefly before each action
+- Quality over quantity — one good verified finding beats five unverified ones`;
+}
+
+/**
+ * Build a status line injected into the context so the agent knows its state.
+ * Factor 3 (Own Your Context Window) + Factor 5 (Unified State) + Factor 13 (Pre-fetch)
+ */
+function buildStepContext(params: {
+  stepNumber: number;
+  maxSteps: number;
+  findingsCount: number;
+  browserActionsUsed: number;
+  maxBrowserActions: number;
+  consecutiveErrors: number;
+}): string {
+  const remaining = params.maxSteps - params.stepNumber;
+  const phase = params.stepNumber <= 5 ? "Phase 1 (Cast the Net)" :
+    params.stepNumber <= 14 ? "Phase 2 (Follow Leads)" :
+    "Phase 3 (Verify & Wrap Up)";
+
+  const parts = [
+    `[Step ${params.stepNumber}/${params.maxSteps} | ${remaining} remaining | ${phase}]`,
+    `[Findings saved: ${params.findingsCount} | Browser uses: ${params.browserActionsUsed}/${params.maxBrowserActions}]`,
+  ];
+
+  if (remaining <= 3) {
+    parts.push(`[WARNING: Only ${remaining} steps left. Wrap up investigation and call done() soon.]`);
+  }
+
+  if (params.browserActionsUsed >= params.maxBrowserActions) {
+    parts.push(`[Browser limit reached. Use web_search for all remaining lookups.]`);
+  }
+
+  if (params.consecutiveErrors >= 2) {
+    parts.push(`[${params.consecutiveErrors} consecutive errors. Reassess your approach — try a different tool or query.]`);
+  }
+
+  return parts.join("\n");
+}
+
+/**
+ * Format tool results with appropriate truncation per tool type.
+ * Factor 3 (Own Your Context Window) — maximize information density.
+ */
+function formatToolResult(tool: string, rawResult: string): string {
+  const MAX_CONTEXT_CHARS = 3500;
+
+  switch (tool) {
+    case "web_search": {
+      // Parse and format for density — only title + URL + short description
+      try {
+        const parsed = JSON.parse(rawResult);
+        if (parsed.results && Array.isArray(parsed.results)) {
+          const formatted = parsed.results.slice(0, 8).map(
+            (r: { title: string; url: string; description: string }, i: number) =>
+              `${i + 1}. ${r.title}\n   ${r.url}\n   ${(r.description || "").slice(0, 150)}`
+          ).join("\n");
+          return `Search: "${parsed.query}"\n${formatted}`.slice(0, MAX_CONTEXT_CHARS);
+        }
+      } catch { /* fall through */ }
+      return rawResult.slice(0, MAX_CONTEXT_CHARS);
+    }
+
+    case "browser_action":
+      // Browser results are already summarized by Browser Use — keep them but cap size
+      return rawResult.slice(0, MAX_CONTEXT_CHARS);
+
+    case "save_finding":
+      return "Finding saved.";
+
+    case "maigret":
+      // Already formatted by formatInvestigationForOpus — allow more space for this high-value result
+      return rawResult.slice(0, 5000);
+
+    default:
+      return rawResult.slice(0, MAX_CONTEXT_CHARS);
+  }
 }
 
 interface ToolCall {
@@ -291,6 +395,8 @@ export const step = internalAction({
     investigationId: v.id("investigations"),
     conversationHistory: v.string(),
     consecutiveSaveOnlySteps: v.optional(v.number()),
+    consecutiveErrors: v.optional(v.number()),
+    browserActionsUsed: v.optional(v.number()),
     maigretAvailable: v.optional(v.boolean()),
     extremeMode: v.optional(v.boolean()),
   },
@@ -309,12 +415,53 @@ export const step = internalAction({
 
     const maigretAvailable = args.maigretAvailable ?? false;
     const extremeMode = args.extremeMode ?? false;
+    let browserActionsUsed = args.browserActionsUsed ?? 0;
+    let consecutiveErrors = args.consecutiveErrors ?? 0;
+
+    // Factor 13: Pre-fetch findings count for step context
+    const findings = await ctx.runQuery(api.investigations.getFindings, { investigationId: args.investigationId });
+    const findingsCount = findings.length;
+
+    const stepNumber = investigation.stepCount + 1;
+
+    // Factor 3 + 5: Build step context and inject into the last user message
+    const stepContext = buildStepContext({
+      stepNumber,
+      maxSteps: MAX_STEPS,
+      findingsCount,
+      browserActionsUsed,
+      maxBrowserActions: MAX_BROWSER_ACTIONS,
+      consecutiveErrors,
+    });
+
+    // Filter tools based on availability and limits
     const tools = TOOL_DEFINITIONS.filter((t) => {
       if (t.name === "maigret_search" && !maigretAvailable) return false;
       if (t.name === "whitepages_lookup" && !extremeMode) return false;
       if (t.name === "darkweb_search" && !extremeMode) return false;
+      // Factor 9: Remove browser_action from available tools when limit reached
+      if (t.name === "browser_action" && browserActionsUsed >= MAX_BROWSER_ACTIONS) return false;
       return true;
     });
+
+    // Inject step context as a system-level status line appended to the last user message
+    const messagesWithContext = [...conversationHistory];
+    const lastMsg = messagesWithContext[messagesWithContext.length - 1];
+    if (lastMsg && lastMsg.role === "user") {
+      if (Array.isArray(lastMsg.content)) {
+        // Tool results — append step context as a text block
+        messagesWithContext[messagesWithContext.length - 1] = {
+          ...lastMsg,
+          content: [...(lastMsg.content as unknown[]), { type: "text", text: `\n${stepContext}` }],
+        };
+      } else {
+        // Text message — append
+        messagesWithContext[messagesWithContext.length - 1] = {
+          ...lastMsg,
+          content: `${lastMsg.content}\n\n${stepContext}`,
+        };
+      }
+    }
 
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -327,7 +474,7 @@ export const step = internalAction({
         model: "claude-opus-4-20250514",
         max_tokens: 4096,
         system: buildSystemPrompt(maigretAvailable, extremeMode),
-        messages: conversationHistory,
+        messages: messagesWithContext,
         tools,
       }),
     });
@@ -364,8 +511,6 @@ export const step = internalAction({
         toolCalls.push({ id: block.id, tool: block.name, args: block.input });
       }
     }
-
-    const stepNumber = investigation.stepCount + 1;
 
     // Log reasoning step (non-blocking — fire and continue)
     const reasoningPromise = reasoning
@@ -405,7 +550,7 @@ export const step = internalAction({
       currentStepNumber = stepNumber + 1;
     }
 
-    // Separate browser_action calls (must be sequential — shared session) from parallelizable tools
+    // Track browser actions used this step
     const browserCalls = toolCalls.filter((tc) => tc.tool === "browser_action");
     const parallelCalls = toolCalls.filter((tc) => tc.tool !== "browser_action");
 
@@ -438,6 +583,7 @@ export const step = internalAction({
       });
       console.log(`[timing] browser_action completed in ${Date.now() - toolStart}ms (sequential)`);
       browserResults.push({ id: tc.id, tool: tc.tool, result });
+      browserActionsUsed++;
     }
 
     const parallelResults = await Promise.allSettled(parallelPromises);
@@ -456,6 +602,21 @@ export const step = internalAction({
     const orderedResults = toolCalls.map((tc) =>
       toolResults.find((tr) => tr.id === tc.id) ?? { id: tc.id, tool: tc.tool, result: "Tool execution failed" }
     );
+
+    // Factor 9: Track consecutive errors for escalation
+    const stepHasErrors = orderedResults.some((tr) =>
+      tr.result.includes("Tool error:") || tr.result.includes("RECOVERY:") || tr.result.includes("timed out")
+    );
+    if (stepHasErrors) {
+      consecutiveErrors++;
+      if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
+        console.warn(`[escalation] ${consecutiveErrors} consecutive errors — forcing report generation`);
+        await generateReport(ctx, args.investigationId);
+        return;
+      }
+    } else {
+      consecutiveErrors = 0;
+    }
 
     let consecutiveSaveOnly = args.consecutiveSaveOnlySteps ?? 0;
     if (hasNonSaveFinding) {
@@ -479,10 +640,11 @@ export const step = internalAction({
     }));
     await ctx.runMutation(api.investigations.addSteps, { steps: stepEntries });
 
+    // Factor 3: Use smart per-tool truncation instead of blind 4000-char slice
     const toolResultBlocks = orderedResults.map((tr) => ({
       type: "tool_result",
       tool_use_id: tr.id,
-      content: tr.result.slice(0, 4000),
+      content: formatToolResult(tr.tool, tr.result),
     }));
 
     const updatedHistory = [
@@ -506,6 +668,8 @@ export const step = internalAction({
       investigationId: args.investigationId,
       conversationHistory: JSON.stringify(finalHistory),
       consecutiveSaveOnlySteps: consecutiveSaveOnly,
+      consecutiveErrors,
+      browserActionsUsed,
       maigretAvailable,
       extremeMode,
     });
