@@ -1,9 +1,9 @@
 import { v } from "convex/values";
-import { action } from "../_generated/server";
+import { internalAction } from "../_generated/server";
 
 const SIDECAR_URL = "http://localhost:8000";
 
-export const search = action({
+export const search = internalAction({
   args: {
     username: v.string(),
   },

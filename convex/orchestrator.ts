@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { action, internalAction } from "./_generated/server";
 import { internal, api } from "./_generated/api";
+import type { ActionCtx } from "./_generated/server";
 
 const MAX_STEPS = 20;
 
@@ -378,10 +379,7 @@ export const step = internalAction({
 });
 
 async function generateReport(
-  ctx: {
-    runQuery: typeof import("./_generated/server").ActionCtx.prototype.runQuery;
-    runMutation: typeof import("./_generated/server").ActionCtx.prototype.runMutation;
-  },
+  ctx: Pick<ActionCtx, "runQuery" | "runMutation">,
   investigationId: string,
   conversationHistory: string
 ) {
@@ -404,7 +402,7 @@ async function generateReport(
 6. Recommendations (suggested next steps for further investigation)
 
 Findings so far:
-${findings.map((f) => `- [${f.category}] ${f.data} (confidence: ${f.confidence}%, source: ${f.source})`).join("\n")}
+${findings.map((f: { category: string; data: string; confidence: number; source: string }) => `- [${f.category}] ${f.data} (confidence: ${f.confidence}%, source: ${f.source})`).join("\n")}
 
 Format as markdown. Be thorough and professional.`,
   });

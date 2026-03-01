@@ -1,9 +1,9 @@
 import { v } from "convex/values";
-import { action } from "../_generated/server";
+import { internalAction } from "../_generated/server";
 
 const BROWSER_USE_API = "https://api.browser-use.com/api/v1";
 
-export const createSession = action({
+export const createSession = internalAction({
   args: {},
   handler: async () => {
     const apiKey = process.env.BROWSER_USE_API_KEY;
@@ -23,7 +23,7 @@ export const createSession = action({
   },
 });
 
-export const runTask = action({
+export const runTask = internalAction({
   args: {
     task: v.string(),
     sessionId: v.optional(v.string()),
@@ -53,7 +53,7 @@ export const runTask = action({
   },
 });
 
-export const getTaskStatus = action({
+export const getTaskStatus = internalAction({
   args: { taskId: v.string() },
   handler: async (_, args) => {
     const apiKey = process.env.BROWSER_USE_API_KEY;

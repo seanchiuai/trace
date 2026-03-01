@@ -1,9 +1,9 @@
 import { v } from "convex/values";
-import { action } from "../_generated/server";
+import { internalAction } from "../_generated/server";
 
 const FACECHECK_API = "https://facecheck.id/api";
 
-export const searchByImage = action({
+export const searchByImage = internalAction({
   args: {
     imageUrl: v.optional(v.string()),
     imageBase64: v.optional(v.string()),
