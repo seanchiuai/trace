@@ -17,7 +17,7 @@ React 19 + TypeScript frontend with Tailwind CSS 4, Framer Motion animations, an
 | TypeScript | 5.9 | Type safety |
 | Tailwind CSS | 4 | Utility-first styling (via `@tailwindcss/vite` plugin) |
 | Framer Motion | 12 | Component animations (enter/exit, spring, layout) |
-| React Router DOM | 7 | Client routing (`/`, `/investigate/:id`) |
+| React Router DOM | 7 | Client routing (`/`, `/runs`, `/investigate/:id`, `/report/:id`) |
 
 ## Design System
 
@@ -54,73 +54,123 @@ Two font families:
 
 | Role | Font | Usage |
 |------|------|-------|
-| Display | `Outfit` (300–900) | Headings, hero text, stat numbers, CTA buttons |
-| Data | `JetBrains Mono` (300–700) | Labels, metadata, code, timestamps, body text |
+| Display | `Outfit` (300-900) | Headings, hero text, stat numbers, CTA buttons |
+| Data | `JetBrains Mono` (300-700) | Labels, metadata, code, timestamps, body text |
 
 ```css
 --font-display: "Outfit", system-ui, sans-serif;
 --font-mono: "JetBrains Mono", "Fira Code", monospace;
 ```
 
-Use `.font-display` for Outfit, `font-mono` (default body) for JetBrains Mono. Labels use `text-xs uppercase tracking-wider text-text-secondary`.
+Use `.font-display` for Outfit, `font-mono` (default body) for JetBrains Mono.
 
 ## Component Inventory
 
 | Component | File | Purpose |
 |-----------|------|---------|
-| `InputForm` | `src/components/InputForm.tsx` | Investigation submission form |
-| `BrowserView` | `src/components/BrowserView.tsx` | Live browser iframe with URL bar |
-| `ActivityStream` | `src/components/ActivityStream.tsx` | Real-time step timeline |
-| `FindingsGrid` | `src/components/FindingsGrid.tsx` | Evidence cards with confidence |
-| `DetectiveReport` | `src/components/DetectiveReport.tsx` | Final report with stats + evidence |
-| `LeadTree` | `src/components/LeadTree.tsx` | Connection network visualization |
-| `ImageGallery` | `src/components/ImageGallery.tsx` | Found images grid |
+| `InputForm` | `src/components/InputForm.tsx` | Investigation submission form with extreme mode toggle |
+| `BrowserView` | `src/components/BrowserView.tsx` | Live browser iframe with floating LIVE pill + URL label |
+| `ActivityStream` | `src/components/ActivityStream.tsx` | Step sub-components (CollapsedStep, ExpandedStep, ToolBadge) |
+| `FindingsGrid` | `src/components/FindingsGrid.tsx` | Evidence cards with confidence bars and category badges |
+| `DetectiveReport` | `src/components/DetectiveReport.tsx` | Dossier-style report with stats, evidence, image gallery, typewriter effect |
+| `LeadTree` | `src/components/LeadTree.tsx` | Connection network (superseded by RelationshipGraph) |
+| `ImageGallery` | `src/components/ImageGallery.tsx` | Found images grid (superseded by inline gallery in DetectiveReport) |
 | `HudHeader` | `src/components/HudHeader.tsx` | Investigation HUD header with status, steps, cost, tokens |
-| `CommandStrip` | `src/components/CommandStrip.tsx` | Collapsible activity stream strip with expand/collapse |
-| `FindingToasts` | `src/components/FindingToasts.tsx` | Real-time finding notification toasts |
+| `CommandStrip` | `src/components/CommandStrip.tsx` | Collapsible bottom activity stream strip |
+| `FindingToasts` | `src/components/FindingToasts.tsx` | Real-time finding notification toasts + slide-out tray |
 | `CompletionFlash` | `src/components/CompletionFlash.tsx` | Full-screen investigation completion overlay |
+| `BehavioralProfile` | `src/components/BehavioralProfile.tsx` | Behavioral analysis cards (timezone, username patterns, predicted handles) |
+| `GeoIntelMap` | `src/components/GeoIntelMap.tsx` | Leaflet map with confidence-colored markers for geo-located findings |
+| `RelationshipGraph` | `src/components/RelationshipGraph.tsx` | Force-directed 2D graph (react-force-graph-2d) for relationship visualization |
+| `ViewSwitcher` | `src/components/ViewSwitcher.tsx` | Vertical toolbar to switch Browser/Graph/Map views with pulse indicators |
+
+### Hooks
+
+| Hook | File | Purpose |
+|------|------|---------|
+| `useGraphData` | `src/hooks/useGraphData.ts` | Transforms findings + graph edges into nodes/links for RelationshipGraph |
 
 ## Pages
 
 | Page | Route | Layout |
 |------|-------|--------|
-| `Home` | `/` | Header → Hero → InputForm → Disclaimer |
-| `Investigation` | `/investigate/:id` | HudHeader → 2-col (BrowserView \| CommandStrip + FindingToasts) → CompletionFlash |
-| `Report` | `/report/:id` | DetectiveReport with full findings + evidence |
+| `Home` | `/` | Header (with All Runs link) -> Hero -> InputForm -> Disclaimer |
+| `Runs` | `/runs` | Card grid of all investigations with status, confidence, time, cost |
+| `Investigation` | `/investigate/:id` | Layered HUD: ambient bg -> ViewSwitcher (Browser/Graph/Map) -> HudHeader (floating) -> FindingToasts (floating) -> CommandStrip (bottom) -> CompletionFlash (overlay) |
+| `Report` | `/report/:id` | DetectiveReport with stats, evidence, behavioral profile, image gallery |
 
 ## Common Patterns
+
+### Section header (most repeated pattern)
+
+```tsx
+<div className="flex items-center gap-3 mb-5">
+  <div className="h-px w-3 bg-accent/30" />
+  <h3 className="text-[10px] font-bold text-text-secondary tracking-[0.2em] uppercase font-mono">
+    {label}
+  </h3>
+  <span className="text-[10px] text-text-muted font-mono tabular-nums">{count}</span>
+</div>
+```
 
 ### Input styling
 
 ```tsx
 <input
-  className="w-full px-4 py-3 bg-bg-card border border-border rounded-lg
-             text-text-primary placeholder:text-text-muted
-             focus:outline-none focus:border-accent transition-colors"
+  className="w-full px-4 py-3 bg-bg-card/80 border rounded-lg text-text-primary text-sm
+             placeholder:text-text-muted/60 focus:outline-none transition-all duration-300
+             border-border hover:border-border-bright
+             focus:border-accent/40 focus:shadow-[0_0_20px_rgba(0,255,136,0.06)]"
 />
 ```
 
 ### Card styling
 
 ```tsx
-<div className="bg-bg-card border border-border rounded-lg p-3
-                hover:border-border-bright transition-colors">
+<div className="relative bg-bg-card/60 border border-border/60 rounded-lg p-3
+                hover:border-border-bright hover:bg-bg-card-hover transition-all duration-200 group">
 ```
 
 ### Label styling
 
 ```tsx
-<label className="block text-xs text-text-secondary mb-1.5 uppercase tracking-wider">
+<span className="text-[10px] text-text-secondary tracking-[0.2em] uppercase font-mono">
+```
+
+### HUD corner brackets
+
+```tsx
+<div className="absolute top-0 left-0 w-2.5 h-2.5 border-t border-l border-accent/15 rounded-tl-xl pointer-events-none" />
+<div className="absolute bottom-0 right-0 w-2.5 h-2.5 border-b border-r border-accent/15 rounded-br-xl pointer-events-none" />
+```
+
+Also available as `.hud-corners` CSS class in `index.css`.
+
+### Glass surface
+
+```css
+.glass { backdrop-filter: blur(12px); background: rgba(7,7,12,0.7); }
+.glass-accent { backdrop-filter: blur(12px); background: rgba(0,255,136,0.08); }
+```
+
+### Loading spinner
+
+```tsx
+<div className="relative w-12 h-12">
+  <div className="absolute inset-0 border-2 border-accent/20 rounded-full" />
+  <div className="absolute inset-0 border-2 border-transparent border-t-accent rounded-full animate-spin" />
+</div>
+<span className="text-[10px] text-text-muted tracking-[0.3em] uppercase font-mono">Loading...</span>
 ```
 
 ### Animated list items (Framer Motion)
 
 ```tsx
-<AnimatePresence>
+<AnimatePresence mode="popLayout">
   {items.map((item) => (
     <motion.div
       key={item._id}
-      initial={{ opacity: 0, x: -20 }}
+      initial={{ opacity: 0, x: -12 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ duration: 0.3 }}
     >
@@ -133,28 +183,29 @@ Use `.font-display` for Outfit, `font-mono` (default body) for JetBrains Mono. L
 ### Confidence color coding
 
 ```typescript
-// Used across FindingsGrid, DetectiveReport
-let color = "text-danger";        // < 40%
-if (confidence >= 80) color = "text-accent";    // green
-else if (confidence >= 60) color = "text-yellow-400";
-else if (confidence >= 40) color = "text-orange-400";
+// Used across FindingsGrid, DetectiveReport, Runs
+// Takes prefix param ("text-" or "bg-") for flexibility
+if (confidence >= 80) return `${prefix}accent`;     // green
+if (confidence >= 60) return `${prefix}yellow-400`;  // or text-warning in DetectiveReport
+if (confidence >= 40) return `${prefix}orange-400`;
+return `${prefix}danger`;                            // red, < 40%
 ```
 
 ### Category badge colors
 
 ```typescript
-const CATEGORY_COLORS = {
-  social: "bg-blue-500/20 text-blue-400 border-blue-500/30",
-  connection: "bg-purple-500/20 text-purple-400 border-purple-500/30",
-  location: "bg-green-500/20 text-green-400 border-green-500/30",
-  activity: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
-  identity: "bg-cyan-500/20 text-cyan-400 border-cyan-500/30",
+const CATEGORY_STYLE: Record<string, { bg: string; text: string; border: string; dot: string }> = {
+  social:     { bg: "bg-blue-500/8",    text: "text-blue-400",    border: "border-blue-500/20",    dot: "bg-blue-400" },
+  connection: { bg: "bg-purple-500/8",  text: "text-purple-400",  border: "border-purple-500/20",  dot: "bg-purple-400" },
+  location:   { bg: "bg-green-500/8",   text: "text-green-400",   border: "border-green-500/20",   dot: "bg-green-400" },
+  activity:   { bg: "bg-yellow-500/8",  text: "text-yellow-400",  border: "border-yellow-500/20",  dot: "bg-yellow-400" },
+  identity:   { bg: "bg-cyan-500/8",    text: "text-cyan-400",    border: "border-cyan-500/20",    dot: "bg-cyan-400" },
 };
 ```
 
 ### Tool icons in ActivityStream
 
-Single-letter abbreviations with tool-specific colors:
+Single-letter abbreviations with tool-specific colors (includes `bg` and `border` fields):
 
 | Tool | Letter | Color |
 |------|--------|-------|
@@ -163,25 +214,45 @@ Single-letter abbreviations with tool-specific colors:
 | browser_action | B | `text-cyan-400` |
 | web_search | W | `text-orange-400` |
 | save_finding | S | `text-yellow-400` |
+| geospy | G | `text-green-400` |
+| whitepages | P | `text-red-400` |
+| reverse_image | I | `text-pink-400` |
+| darkweb | D | `text-red-500` |
 
 ### BrowserView States
 
 | State | Condition | Display |
 |-------|-----------|---------|
-| Planning | `status === "planning"`, no URL | Globe icon + "Waiting for investigation to start..." |
-| Connecting | `status === "investigating"`, no URL | Green pulse + "Connecting to browser..." |
-| Active | `liveUrl` present | URL bar (green dot + "LIVE" badge) + full-height iframe |
+| Planning | `status === "planning"`, no URL | Globe icon + "Waiting for investigation to initialize..." |
+| Connecting | `status === "investigating"`, no URL | Status dot + "Connecting to browser" |
+| Active | `liveUrl` present | Floating "Live" pill (top-right) + URL label (bottom-left) + full-height iframe |
 
-## CSS Animations
+## CSS Animations (in `src/index.css`)
 
+| Name | Effect |
+|------|--------|
+| `pulse` | Opacity 1->0.5->1 |
+| `horizontalScan` | Left-to-right sweep with fade |
+| `float` | Subtle vertical float |
+| `cursorBlink` | Typing cursor blink (step function) |
+| `gridFadeIn` | Fade opacity 0->0.04 |
+| `dataStream` | Vertical translateY scroll |
+| `radarSweep` | 360 degree rotation |
+| `vignetteBreath` | Pulsing vignette box-shadow (4s) |
+| `toastGlow` | Toast entrance flash with box-shadow (0.6s) |
+| `drawCheck` | SVG stroke-dashoffset to 0 |
+| `progressShimmer` | Background-position shimmer |
+| `typewriterCursor` | Border-right color blink |
+| `stampSlam` | Scale 3->0.9->1.05->1 with rotation (0.6s) |
+| `dossierScan` | Top-to-bottom scan line (3s/8s) |
+| `ringDraw` | SVG stroke-dashoffset ring draw |
+| `redactFlicker` | Opacity flicker 0.06->0.12 |
 
-| Name | Effect | Duration |
-|------|--------|----------|
-| `scanLine` | Top-to-bottom sweep with fade | 1.5s infinite |
-| `bracketSnap` | Scale 1.5→0.95→1 with opacity | One-shot |
-| `matchReveal` | Slide in from right 100px | One-shot |
-| `confidenceGlow` | Pulsing green box-shadow | 2s infinite |
-| `pulse` | Opacity 1→0.5→1 | Custom keyframe in index.css |
+## Atmospheric Effects
+
+- **Film grain**: `body::before` with SVG noise at 2.5% opacity
+- **Grid background**: `.grid-bg` class or inline styles with green-tinted grid lines (40-60px)
+- **Radial glow**: Accent-colored radial gradient on hero sections
 
 ## Convex Integration
 
@@ -192,6 +263,9 @@ Frontend uses Convex React hooks:
 const investigation = useQuery(api.investigations.get, { id });
 const steps = useQuery(api.investigations.getSteps, { investigationId });
 const findings = useQuery(api.investigations.getFindings, { investigationId });
+const edges = useQuery(api.graphEdges.getEdges, { investigationId });
+const allInvestigations = useQuery(api.investigations.list);
+const report = useQuery(api.reports.getReport, { investigationId });
 
 // Mutations
 const createInvestigation = useMutation(api.investigations.create);
@@ -200,7 +274,7 @@ const createInvestigation = useMutation(api.investigations.create);
 const startInvestigation = useAction(api.orchestrator.startInvestigation);
 ```
 
-`useQuery` returns reactive data — components re-render automatically when Convex data changes. This powers the real-time activity stream and findings updates.
+`useQuery` returns reactive data — components re-render automatically when Convex data changes.
 
 ## Gotchas
 
