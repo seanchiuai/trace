@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { motion } from "framer-motion";
@@ -49,6 +49,7 @@ export default function Home() {
     targetPhone?: string;
     targetPhoto?: string;
     knownLinks: string[];
+    instructions?: string;
   }) => {
     setLoading(true);
     try {
@@ -113,11 +114,19 @@ export default function Home() {
               Intelligence System
             </span>
           </div>
-          <div className="ml-auto flex items-center gap-2">
-            <span className="status-dot" />
-            <span className="text-[10px] text-text-muted tracking-wider uppercase font-mono">
-              Online
-            </span>
+          <div className="ml-auto flex items-center gap-4">
+            <Link
+              to="/runs"
+              className="text-[10px] text-text-muted hover:text-accent tracking-[0.2em] uppercase font-mono transition-colors"
+            >
+              All Runs
+            </Link>
+            <div className="flex items-center gap-2">
+              <span className="status-dot" />
+              <span className="text-[10px] text-text-muted tracking-wider uppercase font-mono">
+                Online
+              </span>
+            </div>
           </div>
         </div>
       </motion.header>

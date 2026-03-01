@@ -8,6 +8,7 @@ export const create = mutation({
     targetPhone: v.optional(v.string()),
     targetPhoto: v.optional(v.string()),
     knownLinks: v.array(v.string()),
+    instructions: v.optional(v.string()),
     extremeMode: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
@@ -18,6 +19,7 @@ export const create = mutation({
       targetPhone: args.targetPhone,
       targetPhoto: args.targetPhoto,
       knownLinks: args.knownLinks,
+      instructions: args.instructions,
       extremeMode: args.extremeMode,
       status: "planning",
       stepCount: 0,
@@ -52,13 +54,14 @@ export const updateStatus = mutation({
       v.literal("analyzing"),
       v.literal("complete"),
       v.literal("failed"),
+      v.literal("stopped"),
       v.literal("awaiting_input")
     ),
     errorMessage: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const patch: Record<string, unknown> = { status: args.status };
-    if (args.status === "complete") {
+    if (args.status === "complete" || args.status === "stopped") {
       patch.completedAt = Date.now();
     }
     if (args.status === "failed" && args.errorMessage) {

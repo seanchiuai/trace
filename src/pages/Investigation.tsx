@@ -50,6 +50,12 @@ const STATUS_CONFIG: Record<
     dotColor: "bg-danger",
     pulse: false,
   },
+  stopped: {
+    label: "STOPPED",
+    color: "text-warning",
+    dotColor: "bg-warning",
+    pulse: false,
+  },
   awaiting_input: {
     label: "AWAITING INPUT",
     color: "text-amber-400",
@@ -73,6 +79,7 @@ export default function Investigation() {
     investigationId,
   });
   const startInvestigation = useAction(api.orchestrator.startInvestigation);
+  const stopInvestigation = useAction(api.orchestrator.stopInvestigation);
   const pendingClarification = useQuery(api.investigations.getPendingClarification, {
     investigationId,
   });
@@ -82,6 +89,14 @@ export default function Investigation() {
   const [started, setStarted] = useState(false);
   const [showCompletion, setShowCompletion] = useState(false);
   const [activeView, setActiveView] = useState<ViewMode>("browser");
+
+  const handleStop = async () => {
+    try {
+      await stopInvestigation({ investigationId });
+    } catch (e) {
+      console.error("Failed to stop investigation:", e);
+    }
+  };
 
   // Auto-start investigation
   useEffect(() => {
@@ -239,13 +254,14 @@ export default function Investigation() {
       />
 
       {/* Layer 3: Finding toasts */}
-      <FindingToasts findings={findings || []} investigationId={investigationId} isLive={isLive} />
+      <FindingToasts findings={findings || []} />
 
       {/* Layer 4: Command strip */}
       <CommandStrip
         steps={steps || []}
         isLive={isLive}
         progress={progress}
+        onStop={handleStop}
       />
 
       {/* Layer 5: Clarification overlay */}

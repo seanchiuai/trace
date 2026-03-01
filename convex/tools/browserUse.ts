@@ -89,6 +89,11 @@ export const runTask = internalAction({
       model: "bu-max",
     };
 
+    // Use premium model in extreme mode for +12% accuracy
+    if (args.extremeMode) {
+      body.model = "bu-2-0";
+    }
+
     // --- Session reuse: wait for idle or drop ---
     if (args.sessionId) {
       const check = await waitForSessionIdle(args.sessionId);

@@ -47,7 +47,7 @@ export default function ClarificationCard({
     submittedRef.current = true;
     setSubmitting(true);
     try {
-      // Respond with "Not sure" and resume — same flow as a normal answer
+      // Respond with "Not sure" and resume - same flow as a normal answer
       await respondToClarification({ id: clarificationId, response: "Not sure" });
       await resumeFromClarification({ clarificationId });
     } catch (e) {
