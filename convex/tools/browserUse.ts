@@ -25,7 +25,11 @@ export const createSession = internalAction({
       body: JSON.stringify({}),
     });
 
-    if (!res.ok) throw new Error(`Browser Use session creation failed: ${res.status}`);
+    if (!res.ok) {
+      const errBody = await res.text();
+      console.error("Browser Use session creation error:", errBody);
+      throw new Error(`Browser Use session creation failed (${res.status}): ${errBody.slice(0, 300)}`);
+    }
     return await res.json();
   },
 });
@@ -48,7 +52,11 @@ export const runTask = internalAction({
       body: JSON.stringify(body),
     });
 
-    if (!createRes.ok) throw new Error(`Browser Use task creation failed: ${createRes.status}`);
+    if (!createRes.ok) {
+      const errBody = await createRes.text();
+      console.error("Browser Use task creation error:", errBody);
+      throw new Error(`Browser Use task creation failed (${createRes.status}): ${errBody.slice(0, 300)}`);
+    }
     const created = await createRes.json();
     const taskId = created.id;
 
