@@ -39,10 +39,15 @@ src/
 │   ├── FaceScan.tsx         # Face recognition animation overlay
 │   ├── DetectiveReport.tsx  # Final report display
 │   ├── LeadTree.tsx         # Connection network
-│   └── ImageGallery.tsx     # Found images grid
+│   ├── ImageGallery.tsx     # Found images grid
+│   ├── HudHeader.tsx        # Investigation HUD header
+│   ├── CommandStrip.tsx     # Command strip controls
+│   ├── FindingToasts.tsx    # Real-time finding notifications
+│   └── CompletionFlash.tsx  # Investigation completion animation
 ├── pages/
 │   ├── Home.tsx             # Landing + form
-│   └── Investigation.tsx    # Live dashboard
+│   ├── Investigation.tsx    # Live dashboard
+│   └── Report.tsx           # Investigation report page
 convex/
 ├── schema.ts            # Tables: investigations, findings, steps
 ├── investigations.ts    # CRUD + queries
