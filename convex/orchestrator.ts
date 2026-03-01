@@ -270,6 +270,22 @@ export const startInvestigation = action({
   },
 });
 
+export const stopInvestigation = action({
+  args: { investigationId: v.id("investigations") },
+  handler: async (ctx, args) => {
+    const investigation = await ctx.runQuery(api.investigations.get, { id: args.investigationId });
+    if (!investigation) throw new Error("Investigation not found");
+    if (investigation.status === "complete" || investigation.status === "failed" || investigation.status === "stopped") {
+      return;
+    }
+    await ctx.runMutation(api.investigations.updateStatus, {
+      id: args.investigationId,
+      status: "stopped",
+    });
+    await cleanupBrowserSession(ctx, args.investigationId);
+  },
+});
+
 export const step = internalAction({
   args: {
     investigationId: v.id("investigations"),
@@ -281,7 +297,7 @@ export const step = internalAction({
   handler: async (ctx, args) => {
     const investigation = await ctx.runQuery(api.investigations.get, { id: args.investigationId });
     if (!investigation) return;
-    if (investigation.status === "complete" || investigation.status === "failed") return;
+    if (investigation.status === "complete" || investigation.status === "failed" || investigation.status === "stopped") return;
     if (investigation.stepCount >= MAX_STEPS) {
       await generateReport(ctx, args.investigationId);
       return;

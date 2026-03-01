@@ -13,14 +13,16 @@ interface CommandStripProps {
   steps: Step[];
   isLive: boolean;
   progress: number;
+  onStop?: () => void;
 }
 
-export default function CommandStrip({ steps, isLive, progress }: CommandStripProps) {
+export default function CommandStrip({ steps, isLive, progress, onStop }: CommandStripProps) {
   const [expanded, setExpanded] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const [userScrolledUp, setUserScrolledUp] = useState(false);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const [stopping, setStopping] = useState(false);
 
   const currentStep = steps.length > 0 ? steps[steps.length - 1] : null;
   const config = currentStep
@@ -168,6 +170,39 @@ export default function CommandStrip({ steps, isLive, progress }: CommandStripPr
             Waiting for investigation to begin...
           </span>
         )}
+
+        {/* Stop button */}
+        <AnimatePresence>
+          {isLive && onStop && (
+            <motion.button
+              initial={{ opacity: 0, scale: 0.8, width: 0 }}
+              animate={{ opacity: 1, scale: 1, width: "auto" }}
+              exit={{ opacity: 0, scale: 0.8, width: 0 }}
+              transition={{ duration: 0.2 }}
+              onClick={async () => {
+                setStopping(true);
+                try {
+                  await onStop();
+                } catch {
+                  setStopping(false);
+                }
+              }}
+              disabled={stopping}
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-danger/10 hover:bg-danger/20 transition-colors text-danger cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed overflow-hidden"
+            >
+              {stopping ? (
+                <div className="w-3 h-3 border border-danger/50 border-t-danger rounded-full animate-spin" />
+              ) : (
+                <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
+                  <rect x="6" y="6" width="12" height="12" rx="1" />
+                </svg>
+              )}
+              <span className="text-[10px] font-mono font-medium tracking-wider whitespace-nowrap">
+                {stopping ? "STOPPING" : "STOP"}
+              </span>
+            </motion.button>
+          )}
+        </AnimatePresence>
 
         {/* Expand/collapse button with step count */}
         <button
