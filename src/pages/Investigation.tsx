@@ -258,7 +258,7 @@ export default function Investigation() {
       />
 
       {/* Layer 3: Finding toasts */}
-      <FindingToasts findings={findings || []} />
+      <FindingToasts findings={findings || []} investigationId={investigationId} isLive={isLive} />
 
       {/* Layer 3.5: Steering input */}
       <SteeringInput investigationId={investigationId} isLive={isLive} />

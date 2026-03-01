@@ -1,3 +1,7 @@
+import { useState } from "react";
+import { useMutation } from "convex/react";
+import { api } from "../../convex/_generated/api";
+import type { Id } from "../../convex/_generated/dataModel";
 import { motion, AnimatePresence } from "framer-motion";
 
 interface Finding {
@@ -79,9 +83,15 @@ function ConfidenceBar({ confidence }: { confidence: number }) {
 
 export default function FindingsGrid({
   findings,
+  investigationId,
+  isLive,
 }: {
   findings: Finding[];
+  investigationId?: Id<"investigations">;
+  isLive?: boolean;
 }) {
+  const createDirective = useMutation(api.directives.createDirective);
+  const [killedIds, setKilledIds] = useState<Set<string>>(new Set());
   return (
     <div className="p-4">
       {/* Section header */}
@@ -194,6 +204,36 @@ export default function FindingsGrid({
                         minute: "2-digit",
                       })}
                     </span>
+
+                    {/* Kill Lead button */}
+                    {isLive && investigationId && !killedIds.has(finding._id) && (
+                      <button
+                        onClick={async () => {
+                          try {
+                            await createDirective({
+                              investigationId,
+                              type: "kill_lead",
+                              message: `Stop pursuing lead: ${finding.data.slice(0, 100)}`,
+                              findingId: finding._id as Id<"findings">,
+                            });
+                            setKilledIds((prev) => new Set(prev).add(finding._id));
+                          } catch (e) {
+                            console.error("Failed to kill lead:", e);
+                          }
+                        }}
+                        className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity text-danger/60 hover:text-danger text-[10px] font-mono tracking-wide uppercase cursor-pointer flex items-center gap-1"
+                      >
+                        <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                        Kill Lead
+                      </button>
+                    )}
+                    {killedIds.has(finding._id) && (
+                      <span className="ml-auto text-danger/40 text-[10px] font-mono tracking-wide uppercase">
+                        Lead killed
+                      </span>
+                    )}
                   </div>
                 </motion.div>
               );
