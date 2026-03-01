@@ -474,6 +474,7 @@ async function executeToolCall(
             investigationId,
             source: "picarta",
             category: "location",
+            platform: "picarta",
             data: `Photo geo-located to ${locationParts.join(", ")} (${geoResult.latitude}, ${geoResult.longitude}). Confidence: ${conf}%${geoResult.exifCountry ? `. EXIF confirms: ${geoResult.exifCountry}` : ""}`,
             confidence: conf,
           });

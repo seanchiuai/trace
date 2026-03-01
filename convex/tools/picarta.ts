@@ -9,6 +9,10 @@ export const localize = internalAction({
     const apiKey = process.env.PICARTA_API_KEY;
     if (!apiKey) throw new Error("PICARTA_API_KEY not set");
 
+    if (!args.imageUrl.startsWith("http://") && !args.imageUrl.startsWith("https://")) {
+      throw new Error("Invalid image URL: must start with http:// or https://");
+    }
+
     // Picarta accepts URLs directly in the IMAGE field
     const res = await fetch("https://picarta.ai/classify", {
       method: "POST",
