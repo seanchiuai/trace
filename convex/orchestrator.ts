@@ -22,7 +22,7 @@ function buildSystemPrompt(maigretAvailable: boolean): string {
     );
   }
   toolLines.push(
-    `${n++}. browser_action(instruction) — Control a web browser. Give clear instructions like "Go to instagram.com/username and report what you see." Returns screenshots and page text. Use for interactive pages that require login walls, scrolling, or JS rendering. EXPENSIVE — prefer web_search for simple lookups.`,
+    `${n++}. browser_action(instruction) — Control a web browser. Give clear instructions like "Go to imginn.com/username and report what you see." IMPORTANT: For Instagram profiles, ALWAYS use imginn.com (e.g. imginn.com/username) instead of instagram.com — it shows public profiles without login walls. Returns screenshots and page text. Use for interactive pages that require scrolling or JS rendering. EXPENSIVE — prefer web_search for simple lookups.`,
     `${n++}. face_check(imageUrl) — Run facial recognition on an image. Returns matching profiles with confidence scores. Use on group photos or profile pictures.`,
     `${n++}. web_search(query, count?) — Fast web search. Returns titles, URLs, and snippets. Use this FIRST for simple lookups like "John Smith LinkedIn", "username site:twitter.com", company info, news articles, etc. Much faster and cheaper than browser_action.`,
     `${n++}. save_finding(source, category, platform, data, confidence) — Save a confirmed finding. Categories: "social", "connection", "location", "activity", "identity". FREE — does not count toward your step budget. Save findings liberally as you discover them.`,
@@ -88,7 +88,7 @@ const TOOL_DEFINITIONS = [
       properties: {
         instruction: {
           type: "string",
-          description: 'What to do in the browser, e.g. "Go to instagram.com/johndoe and describe what you see"',
+          description: 'What to do in the browser, e.g. "Go to imginn.com/johndoe and describe what you see"',
         },
       },
       required: ["instruction"],
@@ -153,21 +153,6 @@ export const startInvestigation = action({
     if (!investigation) throw new Error("Investigation not found");
 
     await ctx.runMutation(api.investigations.updateStatus, { id: args.investigationId, status: "investigating" });
-
-    // Eagerly create a browser session so the live URL appears in the UI immediately.
-    // Non-blocking: if this fails, runTask will auto-create a session later.
-    try {
-      const session = await ctx.runAction(internal.tools.browserUse.createSession, {});
-      if (session?.id && session?.liveUrl) {
-        await ctx.runMutation(api.investigations.updateBrowserSession, {
-          id: args.investigationId,
-          browserSessionId: session.id,
-          browserLiveUrl: session.liveUrl,
-        });
-      }
-    } catch (e) {
-      console.warn("Eager browser session creation failed (non-blocking):", e);
-    }
 
     let maigretAvailable = false;
     try {
@@ -434,55 +419,21 @@ async function executeToolCall(
         const freshInvestigation = await ctx.runQuery(api.investigations.get, { id: investigationId });
         const sessionId = freshInvestigation?.browserSessionId ?? undefined;
 
-        let browserResult;
-        try {
-          browserResult = await ctx.runAction(internal.tools.browserUse.runTask, {
-            task: toolCall.args.instruction as string,
-            sessionId,
-          });
-        } catch (error) {
-          const errMsg = error instanceof Error ? error.message : String(error);
-          if (errMsg.includes("BROWSER_TASK_CREATION_FAILED:400") && sessionId) {
-            console.warn("Browser session expired, creating fresh session...");
-            try {
-              const newSession = await ctx.runAction(internal.tools.browserUse.createSession, {});
-              if (newSession?.id) {
-                await ctx.runMutation(api.investigations.updateBrowserSession, {
-                  id: investigationId,
-                  browserSessionId: newSession.id,
-                  browserLiveUrl: newSession.liveUrl,
-                });
-              }
-              browserResult = await ctx.runAction(internal.tools.browserUse.runTask, {
-                task: toolCall.args.instruction as string,
-                sessionId: newSession?.id,
-              });
-            } catch (retryError) {
-              return `Tool error (browser retry failed): ${retryError instanceof Error ? retryError.message : String(retryError)}`;
-            }
-          } else {
-            throw error;
-          }
-        }
+        const browserResult = await ctx.runAction(internal.tools.browserUse.runTask, {
+          task: toolCall.args.instruction as string,
+          sessionId,
+          investigationId,
+        });
 
         const toolResult = browserResult?.output ?? JSON.stringify(browserResult);
 
-        if (!sessionId && browserResult?.sessionId) {
-          try {
-            const session = await ctx.runAction(internal.tools.browserUse.getSession, {
-              sessionId: browserResult.sessionId,
-            });
-            await ctx.runMutation(api.investigations.updateBrowserSession, {
-              id: investigationId,
-              browserSessionId: browserResult.sessionId,
-              browserLiveUrl: session?.liveUrl,
-            });
-          } catch {
-            await ctx.runMutation(api.investigations.updateBrowserSession, {
-              id: investigationId,
-              browserSessionId: browserResult.sessionId,
-            });
-          }
+        // v3: runTask returns sessionId + liveUrl directly — always update
+        if (browserResult?.sessionId) {
+          await ctx.runMutation(api.investigations.updateBrowserSession, {
+            id: investigationId,
+            browserSessionId: browserResult.sessionId,
+            browserLiveUrl: browserResult.liveUrl,
+          });
         }
         return toolResult;
       }
