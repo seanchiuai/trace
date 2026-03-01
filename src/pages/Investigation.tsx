@@ -5,8 +5,10 @@ import type { Id } from "../../convex/_generated/dataModel";
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import BrowserView from "../components/BrowserView";
-import ActivityStream from "../components/ActivityStream";
-import FindingsGrid from "../components/FindingsGrid";
+import HudHeader from "../components/HudHeader";
+import CommandStrip from "../components/CommandStrip";
+import FindingToasts from "../components/FindingToasts";
+import CompletionFlash from "../components/CompletionFlash";
 import FaceScan from "../components/FaceScan";
 
 const STATUS_CONFIG: Record<
@@ -62,6 +64,7 @@ export default function Investigation() {
   const startInvestigation = useAction(api.orchestrator.startInvestigation);
 
   const [started, setStarted] = useState(false);
+  const [showCompletion, setShowCompletion] = useState(false);
   const [activeFaceScan, setActiveFaceScan] = useState<{
     imageUrl: string;
     results?: { score: number; url: string; platform: string }[];
@@ -108,23 +111,31 @@ export default function Investigation() {
     }
   }, [steps, shownFaceSteps]);
 
-  // Auto-dismiss FaceScan overlay after 8 seconds (with proper cleanup)
+  // Auto-dismiss FaceScan overlay after 8 seconds
   useEffect(() => {
     if (!activeFaceScan) return;
     const timer = setTimeout(() => setActiveFaceScan(null), 8000);
     return () => clearTimeout(timer);
   }, [activeFaceScan]);
 
-  // Redirect to report page when investigation completes
+  // Trigger cinematic completion flash, then redirect to report
   useEffect(() => {
-    if (investigation?.status === "complete" && investigation.report) {
-      navigate(`/report/${id}`, { replace: true });
+    if (investigation?.status === "complete" && investigation.report && !showCompletion) {
+      setShowCompletion(true);
     }
-  }, [investigation?.status, investigation?.report, id, navigate]);
+  }, [investigation?.status, investigation?.report, showCompletion]);
+
+  useEffect(() => {
+    if (!showCompletion) return;
+    const timer = setTimeout(() => {
+      navigate(`/report/${id}`, { replace: true });
+    }, 2500);
+    return () => clearTimeout(timer);
+  }, [showCompletion, id, navigate]);
 
   if (!investigation) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-bg-primary">
+      <div className="h-screen w-screen flex items-center justify-center bg-bg-primary">
         <div className="flex flex-col items-center gap-4">
           <div className="relative w-12 h-12">
             <div className="absolute inset-0 border-2 border-accent/20 rounded-full" />
@@ -144,155 +155,96 @@ export default function Investigation() {
     (investigation.stepCount / 20) * 100,
     100
   );
+  const isLive =
+    investigation.status === "investigating" ||
+    investigation.status === "planning" ||
+    investigation.status === "analyzing";
 
-  const totalTokens = (investigation.totalInputTokens ?? 0) + (investigation.totalOutputTokens ?? 0);
+  const totalTokens =
+    (investigation.totalInputTokens ?? 0) +
+    (investigation.totalOutputTokens ?? 0);
   const contextWindowPct = Math.min(
     ((investigation.totalInputTokens ?? 0) / 200_000) * 100,
     100
   );
-  const costDisplay = investigation.estimatedCost != null
-    ? `$${investigation.estimatedCost.toFixed(2)}`
-    : "$0.00";
+  const costDisplay =
+    investigation.estimatedCost != null
+      ? `$${investigation.estimatedCost.toFixed(2)}`
+      : "$0.00";
+
+  // Average confidence from findings
+  const avgConfidence =
+    findings && findings.length > 0
+      ? Math.round(
+          findings.reduce((sum, f) => sum + f.confidence, 0) / findings.length
+        )
+      : 0;
 
   return (
-    <div className="h-screen flex flex-col bg-bg-primary overflow-hidden">
-      {/* Header */}
-      <motion.header
-        initial={{ opacity: 0, y: -8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4 }}
-        className="relative border-b border-border px-6 py-0"
+    <div className="h-screen w-screen bg-bg-primary overflow-hidden relative">
+      {/* Layer 0: Ambient background */}
+      <div className="absolute inset-0 z-0">
+        <div
+          className="absolute inset-0 pointer-events-none opacity-30"
+          style={{
+            backgroundImage:
+              "linear-gradient(rgba(0,255,136,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(0,255,136,0.03) 1px, transparent 1px)",
+            backgroundSize: "40px 40px",
+          }}
+        />
+        {/* Radial glow */}
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            background:
+              "radial-gradient(ellipse at 50% 50%, rgba(0,255,136,0.03) 0%, transparent 60%)",
+          }}
+        />
+      </div>
+
+      {/* Layer 1: Browser hero */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.6, delay: 0.1 }}
+        className="absolute inset-0 z-10 p-3 pt-16 pb-14 sm:p-4 sm:pt-16 sm:pb-14"
       >
-        <div className="flex items-center h-14">
-          {/* Logo + Target */}
-          <div className="flex items-center gap-3">
-            <a
-              href="/"
-              className="relative w-8 h-8 rounded-lg bg-accent/10 border border-accent/20 flex items-center justify-center group hover:bg-accent/15 transition-colors"
-            >
-              <span className="font-display font-bold text-accent text-xs">
-                T
-              </span>
-              <div className="absolute -top-px -left-px w-2 h-2 border-t border-l border-accent/40" />
-              <div className="absolute -bottom-px -right-px w-2 h-2 border-b border-r border-accent/40" />
-            </a>
-            <div className="h-4 w-px bg-border" />
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] text-text-muted tracking-wider uppercase font-mono">
-                Subject
-              </span>
-              <span className="text-sm text-text-primary font-display font-medium">
-                {investigation.targetName}
-              </span>
-            </div>
-          </div>
+        <BrowserView
+          liveUrl={investigation.browserLiveUrl}
+          status={investigation.status}
+        />
+      </motion.div>
 
-          {/* Status + Progress */}
-          <div className="ml-auto flex items-center gap-5">
-            {/* Status badge */}
-            <div className="flex items-center gap-2">
-              <div className="relative">
-                <div
-                  className={`w-2 h-2 rounded-full ${status.dotColor}`}
-                />
-                {status.pulse && (
-                  <div
-                    className={`absolute inset-0 rounded-full ${status.dotColor} animate-ping opacity-40`}
-                  />
-                )}
-              </div>
-              <span
-                className={`text-[10px] font-bold tracking-[0.2em] ${status.color}`}
-              >
-                {status.label}
-              </span>
-            </div>
+      {/* Layer 2: HUD Header */}
+      <HudHeader
+        targetName={investigation.targetName}
+        status={investigation.status}
+        statusLabel={status.label}
+        statusColor={status.color}
+        dotColor={status.dotColor}
+        pulse={status.pulse}
+        stepCount={investigation.stepCount}
+        costDisplay={costDisplay}
+        contextWindowPct={contextWindowPct}
+        totalTokens={totalTokens}
+        errorMessage={
+          investigation.status === "failed"
+            ? investigation.errorMessage
+            : undefined
+        }
+      />
 
-            {/* Step counter */}
-            <div className="flex items-center gap-2">
-              <div className="w-24 h-1 bg-bg-card rounded-full overflow-hidden">
-                <motion.div
-                  className="h-full bg-accent/60 rounded-full"
-                  initial={{ width: 0 }}
-                  animate={{ width: `${progress}%` }}
-                  transition={{ duration: 0.5, ease: "easeOut" }}
-                />
-              </div>
-              <span className="text-[10px] text-text-muted font-mono tabular-nums">
-                {investigation.stepCount}/20
-              </span>
-            </div>
+      {/* Layer 3: Finding toasts */}
+      <FindingToasts findings={findings || []} />
 
-            <div className="h-4 w-px bg-border" />
+      {/* Layer 4: Command strip */}
+      <CommandStrip
+        steps={steps || []}
+        isLive={isLive}
+        progress={progress}
+      />
 
-            {/* Token / Context / Cost stats */}
-            <div className="flex items-center gap-3">
-              {/* Context window usage */}
-              <div className="flex items-center gap-1.5">
-                <div className="w-16 h-1 bg-bg-card rounded-full overflow-hidden">
-                  <motion.div
-                    className={`h-full rounded-full ${contextWindowPct > 80 ? "bg-danger" : contextWindowPct > 50 ? "bg-warning" : "bg-info/60"}`}
-                    initial={{ width: 0 }}
-                    animate={{ width: `${contextWindowPct}%` }}
-                    transition={{ duration: 0.5, ease: "easeOut" }}
-                  />
-                </div>
-                <span className="text-[10px] text-text-muted font-mono tabular-nums">
-                  {contextWindowPct.toFixed(0)}%
-                </span>
-              </div>
-
-              {/* Token count */}
-              <span className="text-[10px] text-text-muted font-mono tabular-nums" title={`Input: ${(investigation.totalInputTokens ?? 0).toLocaleString()} | Output: ${(investigation.totalOutputTokens ?? 0).toLocaleString()}`}>
-                {totalTokens > 1000 ? `${(totalTokens / 1000).toFixed(1)}k` : totalTokens} tok
-              </span>
-
-              {/* Cost */}
-              <span className="text-[10px] text-text-muted font-mono tabular-nums">
-                {costDisplay}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* Bottom glow line */}
-        {status.pulse && (
-          <div
-            className="absolute bottom-0 left-0 right-0 h-px"
-            style={{
-              background:
-                "linear-gradient(90deg, transparent, var(--color-accent) 30%, var(--color-accent) 70%, transparent)",
-              opacity: 0.15,
-            }}
-          />
-        )}
-      </motion.header>
-
-      {/* Error banner */}
-      <AnimatePresence>
-        {investigation.status === "failed" && investigation.errorMessage && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
-            className="border-b border-danger/30 bg-danger/5 px-6 py-3"
-          >
-            <div className="flex items-start gap-3">
-              <span className="text-danger text-sm mt-0.5">!</span>
-              <div className="flex-1 min-w-0">
-                <p className="text-[10px] text-danger font-bold tracking-[0.2em] uppercase mb-1">
-                  Investigation Failed
-                </p>
-                <p className="text-xs text-text-secondary font-mono break-all">
-                  {investigation.errorMessage}
-                </p>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* FaceScan overlay */}
+      {/* Layer 5: FaceScan overlay */}
       <AnimatePresence>
         {activeFaceScan && (
           <FaceScan
@@ -303,42 +255,16 @@ export default function Investigation() {
         )}
       </AnimatePresence>
 
-      {/* Main content — fixed to viewport height */}
-      <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[1fr_420px]">
-        {/* Left: Browser view OR Report */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.5, delay: 0.1 }}
-          className="border-r border-border min-h-0 relative overflow-hidden"
-        >
-          <BrowserView
-            liveUrl={investigation.browserLiveUrl}
-            status={investigation.status}
+      {/* Layer 6: Completion cinematic flash */}
+      <AnimatePresence>
+        {showCompletion && (
+          <CompletionFlash
+            confidence={avgConfidence}
+            findingsCount={findings?.length ?? 0}
+            stepsCount={investigation.stepCount}
           />
-        </motion.div>
-
-        {/* Right: Activity + Findings */}
-        <motion.div
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.5, delay: 0.2 }}
-          className="flex flex-col min-h-0 overflow-hidden"
-        >
-          {/* Activity Stream */}
-          <div className="flex-1 min-h-0 border-b border-border">
-            <ActivityStream
-              steps={steps || []}
-              isLive={investigation.status === "investigating" || investigation.status === "planning" || investigation.status === "analyzing"}
-            />
-          </div>
-
-          {/* Findings */}
-          <div className="h-72 lg:h-80 overflow-y-auto shrink-0">
-            <FindingsGrid findings={findings || []} />
-          </div>
-        </motion.div>
-      </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
