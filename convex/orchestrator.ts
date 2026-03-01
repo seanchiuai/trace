@@ -1477,6 +1477,7 @@ Respond with ONLY a valid JSON object (no markdown, no code fences):
           id: investigationId,
           inputTokens: profileData.usage.input_tokens ?? 0,
           outputTokens: profileData.usage.output_tokens ?? 0,
+          model: "claude-opus-4-20250514",
         });
       }
       const profileText = profileData.content?.find((b: { type: string }) => b.type === "text")?.text || "";
@@ -1488,10 +1489,10 @@ Respond with ONLY a valid JSON object (no markdown, no code fences):
           const enriched = {
             profiles: parsed.profiles.map((p: { label: string; matchConfidence: number; findingIndices: number[]; keyEvidence: number[]; redFlags: string[]; summary: string }) => ({
               ...p,
-              findingIds: (p.findingIndices || []).map((i: number) => findings[i]?._id).filter(Boolean),
-              keyEvidenceIds: (p.keyEvidence || []).map((i: number) => findings[i]?._id).filter(Boolean),
+              findingIds: (p.findingIndices || []).filter((i: number) => Number.isInteger(i) && i >= 0 && i < findings.length).map((i: number) => findings[i]._id),
+              keyEvidenceIds: (p.keyEvidence || []).filter((i: number) => Number.isInteger(i) && i >= 0 && i < findings.length).map((i: number) => findings[i]._id),
             })),
-            unattributed: (parsed.unattributed || []).map((i: number) => findings[i]?._id).filter(Boolean),
+            unattributed: (parsed.unattributed || []).filter((i: number) => Number.isInteger(i) && i >= 0 && i < findings.length).map((i: number) => findings[i]._id),
           };
           profileReportJson = JSON.stringify(enriched);
         }

@@ -81,14 +81,11 @@ export const updateReport = mutation({
     profileReport: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const patch: Record<string, unknown> = {
+    await ctx.db.patch(args.id, {
       report: args.report,
       confidence: args.confidence,
-    };
-    if (args.profileReport !== undefined) {
-      patch.profileReport = args.profileReport;
-    }
-    await ctx.db.patch(args.id, patch);
+      profileReport: args.profileReport,
+    });
   },
 });
 
