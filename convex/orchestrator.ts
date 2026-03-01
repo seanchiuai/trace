@@ -469,7 +469,7 @@ export const step = internalAction({
     });
 
     if (pendingDirectives.length > 0) {
-      const directiveLines = pendingDirectives.map((d: { type: string; message: string; _id: string }) => {
+      const directiveLines = pendingDirectives.map((d) => {
         if (d.type === "kill_lead") {
           return `OPERATOR DIRECTIVE: KILL LEAD. Stop pursuing: ${d.message}`;
         }
@@ -491,7 +491,7 @@ export const step = internalAction({
 
       // Acknowledge directives
       await ctx.runMutation(api.directives.acknowledgeDirectives, {
-        directiveIds: pendingDirectives.map((d: { _id: string }) => d._id),
+        directiveIds: pendingDirectives.map((d) => d._id),
       });
 
       // Log directive step
@@ -508,8 +508,8 @@ export const step = internalAction({
       investigationId: args.investigationId,
     });
     const killedLeads = allDirectives
-      .filter((d: { type: string }) => d.type === "kill_lead")
-      .map((d: { message: string }) => d.message);
+      .filter((d) => d.type === "kill_lead")
+      .map((d) => d.message);
 
     const maigretAvailable = args.maigretAvailable ?? false;
     const extremeMode = args.extremeMode ?? false;
@@ -561,7 +561,7 @@ export const step = internalAction({
         "content-type": "application/json",
       },
       body: JSON.stringify({
-        model: "claude-opus-4-20250514",
+        model: "claude-sonnet-4-20250514",
         max_tokens: 4096,
         system: buildSystemPrompt(maigretAvailable, extremeMode),
         messages: messagesWithContext,
