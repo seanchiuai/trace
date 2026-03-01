@@ -6,17 +6,13 @@ import type { ActionCtx } from "./_generated/server";
 const MAX_STEPS = 20;
 const MAX_CONSECUTIVE_SAVE_ONLY = 3;
 
-// Issue 7: History compression — sliding window + Sonnet summarization
-const COMPRESSION_TOKEN_THRESHOLD = 20_000; // ~70K chars → trigger compression
-const KEEP_RECENT_EXCHANGES = 3; // Keep last 3 exchanges verbatim
+const COMPRESSION_TOKEN_THRESHOLD = 20_000;
+const KEEP_RECENT_EXCHANGES = 3;
 
-/** Rough token estimate: ~3.5 chars per token for mixed English/JSON */
 function estimateTokens(text: string): number {
   return Math.ceil(text.length / 3.5);
 }
 
-// Issue 3: Adaptive system prompt — no fixed strategy, considers target type & available info
-// Maigret tool description and strategy are conditionally included based on sidecar availability
 function buildSystemPrompt(maigretAvailable: boolean): string {
   const toolLines: string[] = [];
   let n = 1;
@@ -64,7 +60,6 @@ ${strategyBullets.join("\n")}
 Always explain your reasoning before choosing an action. Be thorough but efficient.`;
 }
 
-// Issue 8: ToolCall now carries the tool_use_id for proper multi-tool responses
 interface ToolCall {
   id: string;
   tool: string;
@@ -215,17 +210,16 @@ export const startInvestigation = action({
       console.warn("Eager browser session creation failed (non-blocking):", e);
     }
 
-    // Health-check maigret sidecar — if unreachable, exclude from tools so the agent never wastes steps on it
+    // Health-check maigret sidecar
     let maigretAvailable = false;
     try {
       const health = await ctx.runAction(internal.tools.maigret.healthCheck, {});
       maigretAvailable = health.healthy === true;
     } catch {
-      // Sidecar unreachable — will be excluded from tools
+      // Sidecar unreachable
     }
     console.log(`Maigret sidecar health check: ${maigretAvailable ? "available" : "unavailable"}`);
 
-    // Issue 3: Build an "available info summary" so the agent adapts its first move
     const infoLines: string[] = [];
     infoLines.push(`Name: ${investigation.targetName}`);
     if (investigation.targetDescription)
@@ -239,7 +233,6 @@ export const startInvestigation = action({
     else
       infoLines.push(`No photo provided`);
 
-    // Extract any usernames from known links for the summary
     const usernames = extractUsernamesFromLinks(investigation.knownLinks);
     if (usernames.length > 0)
       infoLines.push(`Extracted usernames from links: ${usernames.join(", ")}`);
@@ -284,11 +277,9 @@ export const step = internalAction({
 
     const conversationHistory = JSON.parse(args.conversationHistory);
 
-    // Call Claude Opus to decide next action
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) throw new Error("ANTHROPIC_API_KEY not set");
 
-    // Exclude maigret tool if sidecar is unavailable
     const maigretAvailable = args.maigretAvailable ?? false;
     const tools = maigretAvailable
       ? TOOL_DEFINITIONS
@@ -333,7 +324,6 @@ export const step = internalAction({
       });
     }
 
-    // Issue 8: Collect ALL text and tool_use blocks (not just the last one)
     let reasoning = "";
     const toolCalls: ToolCall[] = [];
 
@@ -345,10 +335,8 @@ export const step = internalAction({
       }
     }
 
-    // Use the current step count for logging (before any increment)
     const stepNumber = investigation.stepCount + 1;
 
-    // Log the reasoning step
     if (reasoning) {
       await ctx.runMutation(api.investigations.addStep, {
         investigationId: args.investigationId,
@@ -364,14 +352,12 @@ export const step = internalAction({
       return;
     }
 
-    // Check for "done" tool — handle immediately
     const doneCall = toolCalls.find((tc) => tc.tool === "done");
     if (doneCall) {
       await generateReport(ctx, args.investigationId, args.conversationHistory);
       return;
     }
 
-    // Issue 8: Execute ALL tool calls and collect results
     const toolResults: { id: string; tool: string; result: string }[] = [];
     let hasNonSaveFinding = false;
 
@@ -386,7 +372,6 @@ export const step = internalAction({
       toolResults.push({ id: tc.id, tool: tc.tool, result });
     }
 
-    // Issue 5: Only increment step if at least one non-save_finding tool ran
     let consecutiveSaveOnly = args.consecutiveSaveOnlySteps ?? 0;
     if (hasNonSaveFinding) {
       await ctx.runMutation(api.investigations.incrementStep, {
@@ -395,7 +380,7 @@ export const step = internalAction({
       consecutiveSaveOnly = 0;
     } else {
       consecutiveSaveOnly++;
-      // Safety: prevent infinite save_finding-only loops
+      // Prevent infinite save_finding-only loops
       if (consecutiveSaveOnly >= MAX_CONSECUTIVE_SAVE_ONLY) {
         await ctx.runMutation(api.investigations.incrementStep, {
           id: args.investigationId,
@@ -404,7 +389,6 @@ export const step = internalAction({
       }
     }
 
-    // Log results for each tool
     for (const tr of toolResults) {
       await ctx.runMutation(api.investigations.addStep, {
         investigationId: args.investigationId,
@@ -871,7 +855,7 @@ async function generateReport(
     body: JSON.stringify({
       model: "claude-opus-4-20250514",
       max_tokens: 4096,
-      system: SYSTEM_PROMPT,
+      system: "You are an expert investigator writing a final report. Be thorough, analytical, and cite your sources.",
       messages: [
         {
           role: "user",
