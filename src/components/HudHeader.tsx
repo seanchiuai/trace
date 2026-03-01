@@ -1,4 +1,5 @@
 import { motion, AnimatePresence } from "framer-motion";
+import { Link } from "react-router-dom";
 
 interface HudHeaderProps {
   targetName: string;
@@ -54,6 +55,14 @@ export default function HudHeader({
 
         {/* Right pills */}
         <div className="flex items-center gap-2">
+          {/* All Runs link */}
+          <Link
+            to="/runs"
+            className="flex items-center h-9 px-3.5 rounded-full glass text-[10px] text-text-muted hover:text-accent tracking-[0.2em] uppercase font-mono font-bold transition-colors hover:bg-white/[0.07]"
+          >
+            All Runs
+          </Link>
+
           {/* Status badge */}
           <div className="flex items-center gap-2 h-9 px-3.5 rounded-full glass">
             <div className="relative">

@@ -59,7 +59,7 @@ function buildSystemPrompt(maigretAvailable: boolean, extremeMode: boolean = fal
     `- When you find photos with visible backgrounds (buildings, streets, landscapes), run geo_locate to predict GPS location`,
     `- Use web_search for simple lookups; reserve browser_action for pages that need interaction`,
     `- Save findings as you go (it's free — doesn't burn steps)`,
-    `- You can call multiple tools at once — do so when actions are independent`,
+    `<use_parallel_tool_calls>\nFor maximum efficiency, whenever you perform multiple independent operations, invoke all relevant tools simultaneously rather than sequentially.\nPrioritize calling tools in parallel whenever possible.\n</use_parallel_tool_calls>`,
     `- After gathering enough evidence (or nearing 20 steps), call done()`,
   ];
 
