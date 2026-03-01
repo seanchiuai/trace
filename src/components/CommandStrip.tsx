@@ -62,7 +62,6 @@ export default function CommandStrip({ steps, directives = [], isLive, progress,
 
   const lastStepId = steps.length > 0 ? steps[steps.length - 1]._id : null;
 
-  // Merge steps and directives into a single timeline sorted by createdAt
   type TimelineItem =
     | { kind: "step"; item: Step }
     | { kind: "directive"; item: Directive };

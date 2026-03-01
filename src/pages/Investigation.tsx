@@ -260,10 +260,10 @@ export default function Investigation() {
       {/* Layer 3: Finding toasts */}
       <FindingToasts findings={findings || []} investigationId={investigationId} isLive={isLive} />
 
-      {/* Layer 3.5: Steering input */}
+      {/* Layer 4: Steering input */}
       <SteeringInput investigationId={investigationId} isLive={isLive} />
 
-      {/* Layer 4: Command strip */}
+      {/* Layer 5: Command strip */}
       <CommandStrip
         steps={steps || []}
         directives={directives || []}
@@ -272,7 +272,7 @@ export default function Investigation() {
         onStop={handleStop}
       />
 
-      {/* Layer 5: Clarification overlay */}
+      {/* Layer 6: Clarification overlay */}
       <AnimatePresence>
         {pendingClarification && investigation.status === "awaiting_input" && (
           <ClarificationCard
@@ -285,7 +285,7 @@ export default function Investigation() {
         )}
       </AnimatePresence>
 
-      {/* Layer 6: Completion cinematic flash */}
+      {/* Layer 7: Completion cinematic flash */}
       <AnimatePresence>
         {showCompletion && (
           <CompletionFlash
