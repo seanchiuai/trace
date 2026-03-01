@@ -24,7 +24,7 @@ function buildSystemPrompt(maigretAvailable: boolean, extremeMode: boolean = fal
     );
   }
   toolLines.push(
-    `${n++}. browser_action(instruction) — Control a real browser. Returns page text. For Instagram, use imginn.com/username. SLOW (~60-180s) and LIMITED to ${MAX_BROWSER_ACTIONS} uses per investigation. See BROWSER RULES below.`,
+    `${n++}. browser_action(instruction) — Control a real browser. Returns page text. SLOW (~60-180s) and LIMITED to ${MAX_BROWSER_ACTIONS} uses per investigation. See BROWSER RULES and LOGIN WALL AVOIDANCE below.`,
     `${n++}. web_search(query, count?) — Fast web search (<1s). Returns titles, URLs, snippets. YOUR DEFAULT TOOL for lookups.`,
     `${n++}. geospy_predict(imageUrl) — AI photo geolocation. Returns GPS, city, country, visual clue explanation.`,
     `${n++}. geo_locate(imageUrl) — Picarta AI geolocation. Returns coordinates, confidence, EXIF, top-3 predictions.`,
@@ -38,6 +38,7 @@ function buildSystemPrompt(maigretAvailable: boolean, extremeMode: boolean = fal
   }
   toolLines.push(
     `${n++}. save_finding(source, category, platform, data, confidence, imageUrl?, profileUrl?) — Save a confirmed finding. Categories: "social", "connection", "location", "activity", "identity". FREE — does not count toward your step budget. Save liberally. Always include imageUrl when you have one.`,
+    `${n++}. ask_user(question, options, context?) — Ask the user a clarifying question with 2-4 selectable options. Use when results are ambiguous and a quick answer would save multiple steps (e.g. "Found 12 John Smiths — which city are they likely in?"). Always include "Not sure" as the last option. FREE — doesn't burn steps.`,
     `${n++}. done(summary) — End the investigation. Call this when you've gathered enough evidence or are running low on steps.`
   );
 
@@ -54,7 +55,17 @@ browser_action is your LAST RESORT, not your default. Follow this decision tree:
 4. Did browser_action just fail/timeout? → NEVER retry browser. Switch to web_search.
 
 NEVER use browser_action for: LinkedIn, GitHub, Facebook public pages, news articles, Wikipedia — web_search gets the same data 250x faster.
-ONLY use browser_action for: imginn.com (Instagram proxy), pages requiring login-wall bypass, interactive content.
+ONLY use browser_action for: imginn.com (Instagram proxy), urlebird.com (TikTok proxy), pages requiring interaction.
+
+## LOGIN WALL AVOIDANCE
+NEVER visit these sites directly in browser_action — use alternatives:
+- Instagram → imginn.com/username or picuki.com/profile/username (public viewer, no login)
+- TikTok → urlebird.com/user/username (public viewer, no login)
+- Facebook → web_search "site:facebook.com name" for cached data; or mbasic.facebook.com/username
+- LinkedIn → web_search "site:linkedin.com/in/ name title" (Google caches public profiles; NEVER browse directly)
+- Twitter/X → nitter.net/username or xcancel.com/username; fall back to web_search "site:x.com username"
+- Pinterest → web_search "site:pinterest.com username"; or browse pinterest.com/username/ (usually public)
+- Reddit → old.reddit.com/user/username (no login needed)
 
 ## PARALLEL EXECUTION
 <use_parallel_tool_calls>
@@ -68,6 +79,7 @@ Adapt to what you know. Each step is precious — make it count.
 **Phase 1 — Cast the Net (Steps 1-5):**
 ${maigretAvailable ? "- Username known → start with maigret_search (wide OSINT net)" : ""}
 - Name only → parallel web_search: "Name LinkedIn", "Name Twitter", "Name Instagram", "Name GitHub"
+- Common name → add description details (city, job, age) to searches; use ask_user if results are ambiguous
 - Photo available → parallel: geospy_predict + reverse_image_search
 - Links provided → web_search each link for context
 ${extremeMode ? "- Email/username → darkweb_search for breach records" : ""}
@@ -306,6 +318,27 @@ const TOOL_DEFINITIONS = [
     },
   },
   {
+    name: "ask_user",
+    description:
+      "Ask the user a clarifying question when you're stuck or results are ambiguous. Present 2-4 clear options. Use sparingly — only when disambiguation would save multiple wasted steps. Examples: 'Multiple John Smiths found — which city?', 'Is this the right person?' FREE — does not count toward step budget.",
+    input_schema: {
+      type: "object",
+      properties: {
+        question: { type: "string", description: "The question to ask" },
+        options: {
+          type: "array",
+          items: { type: "string" },
+          description: "2-4 answer options (always include 'Not sure' as last option)",
+        },
+        context: {
+          type: "string",
+          description: "Brief context for why you're asking",
+        },
+      },
+      required: ["question", "options"],
+    },
+  },
+  {
     name: "done",
     description: "End the investigation and generate the final detective report.",
     input_schema: {
@@ -350,11 +383,17 @@ export const startInvestigation = action({
 
     const extremeMode = investigation.extremeMode ?? false;
 
+    let userMessage = `Investigate this person.\n\nAvailable info summary:\n${infoLines.join("\n")}`;
+    if (investigation.instructions) {
+      userMessage += `\n\nSpecial Instructions:\n${investigation.instructions}`;
+    }
+    userMessage += `\n\nBegin your investigation. Adapt your strategy to the available information - what's your first move?`;
+
     await ctx.scheduler.runAfter(0, internal.orchestrator.step, {
       investigationId: args.investigationId,
       conversationHistory: JSON.stringify([{
         role: "user",
-        content: `Investigate this person.\n\nAvailable info summary:\n${infoLines.join("\n")}\n\nBegin your investigation. Adapt your strategy to the available information — what's your first move?`,
+        content: userMessage,
       }]),
       consecutiveSaveOnlySteps: 0,
       maigretAvailable,
@@ -452,7 +491,7 @@ export const step = internalAction({
         "content-type": "application/json",
       },
       body: JSON.stringify({
-        model: "claude-opus-4-20250514",
+        model: "claude-sonnet-4-20250514",
         max_tokens: 4096,
         system: buildSystemPrompt(maigretAvailable, extremeMode),
         messages: messagesWithContext,
@@ -512,6 +551,39 @@ export const step = internalAction({
     if (toolCalls.find((tc) => tc.tool === "done")) {
       await reasoningPromise;
       await generateReport(ctx, args.investigationId);
+      return;
+    }
+
+    // Handle ask_user — pause the loop and wait for user response
+    const askUserCall = toolCalls.find((tc) => tc.tool === "ask_user");
+    if (askUserCall) {
+      await reasoningPromise;
+      const askArgs = askUserCall.args as { question: string; options: string[]; context?: string };
+
+      const frozenHistory = [
+        ...conversationHistory,
+        { role: "assistant", content: data.content },
+      ];
+
+      await ctx.runMutation(api.investigations.createClarification, {
+        investigationId: args.investigationId,
+        question: askArgs.question,
+        options: askArgs.options,
+        context: askArgs.context,
+        conversationHistory: JSON.stringify(frozenHistory),
+        consecutiveSaveOnlySteps: args.consecutiveSaveOnlySteps ?? 0,
+        maigretAvailable: args.maigretAvailable ?? false,
+        extremeMode: args.extremeMode ?? false,
+      });
+
+      await ctx.runMutation(api.investigations.addStep, {
+        investigationId: args.investigationId,
+        stepNumber,
+        action: `Asking user: ${askArgs.question}`,
+        tool: "ask_user",
+      });
+
+      // DON'T schedule next step — wait for user response
       return;
     }
 
@@ -1398,3 +1470,41 @@ function calculateOverallConfidence(findings: { confidence: number }[]): number 
   const sum = findings.reduce((acc, f) => acc + f.confidence, 0);
   return Math.round(sum / findings.length);
 }
+
+export const resumeFromClarification = action({
+  args: { clarificationId: v.id("clarifications") },
+  handler: async (ctx, args) => {
+    const clar = await ctx.runQuery(api.investigations.getClarification, { id: args.clarificationId });
+    if (!clar || clar.status !== "answered") return;
+
+    const frozenHistory = JSON.parse(clar.conversationHistory);
+    const lastAssistant = frozenHistory[frozenHistory.length - 1];
+
+    const toolResultBlocks = lastAssistant.content
+      .filter((b: { type: string }) => b.type === "tool_use")
+      .map((b: { type: string; id: string; name: string }) => {
+        if (b.name === "ask_user") {
+          return { type: "tool_result", tool_use_id: b.id, content: `User answered: "${clar.response}"` };
+        }
+        return { type: "tool_result", tool_use_id: b.id, content: "Skipped — paused for user clarification" };
+      });
+
+    const resumedHistory = [
+      ...frozenHistory,
+      { role: "user", content: toolResultBlocks },
+    ];
+
+    await ctx.runMutation(api.investigations.updateStatus, {
+      id: clar.investigationId,
+      status: "investigating",
+    });
+
+    await ctx.scheduler.runAfter(0, internal.orchestrator.step, {
+      investigationId: clar.investigationId,
+      conversationHistory: JSON.stringify(resumedHistory),
+      consecutiveSaveOnlySteps: clar.consecutiveSaveOnlySteps,
+      maigretAvailable: clar.maigretAvailable,
+      extremeMode: clar.extremeMode,
+    });
+  },
+});

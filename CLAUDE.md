@@ -22,40 +22,56 @@ cd sidecar && pip install -r requirements.txt && python server.py
 - **Convex** — Backend (schema, mutations, queries, actions, scheduler)
 - **Framer Motion** — Animations
 - **React Router DOM 7** — Client-side routing
-- **Anthropic API** (Claude Opus) — Orchestrator LLM (called from Convex actions)
+- **Anthropic API** (Claude Sonnet for agentic loop, Opus for reports) — Orchestrator LLM
 - **Browser Use API** — Cloud browser automation
 - **Maigret** — Username OSINT (Python sidecar via FastAPI)
+- **GeoSpy AI** — Photo geolocation (visual clue analysis)
+- **Picarta AI** — Photo geolocation (alternative engine, EXIF extraction)
+- **SerpAPI** — Reverse image search (Google Lens)
+- **WhitePages** — Person lookup by name/phone (extreme mode)
+- **IntelX** — Dark web / breach search (extreme mode)
 
 ## Architecture
 
 ```
 src/
-├── components/          # React components
+├── components/
 │   ├── InputForm.tsx        # Investigation input form
 │   ├── BrowserView.tsx      # Live browser iframe
 │   ├── ActivityStream.tsx   # Real-time step log
 │   ├── FindingsGrid.tsx     # Evidence cards with confidence
-│   ├── DetectiveReport.tsx  # Final report display
+│   ├── DetectiveReport.tsx  # Final report (lightbox, visual evidence gallery)
 │   ├── LeadTree.tsx         # Connection network
 │   ├── ImageGallery.tsx     # Found images grid
+│   ├── GeoIntelMap.tsx      # Geographic intelligence map
+│   ├── RelationshipGraph.tsx # Entity relationship visualization
+│   ├── BehavioralProfile.tsx # Behavioral analysis display
+│   ├── ViewSwitcher.tsx     # Tab switcher for investigation views
 │   ├── HudHeader.tsx        # Investigation HUD header
-│   ├── CommandStrip.tsx     # Command strip controls
+│   ├── CommandStrip.tsx     # Command strip + stop button
 │   ├── FindingToasts.tsx    # Real-time finding notifications
 │   └── CompletionFlash.tsx  # Investigation completion animation
 ├── pages/
 │   ├── Home.tsx             # Landing + form
+│   ├── Runs.tsx             # All investigations list
 │   ├── Investigation.tsx    # Live dashboard
 │   └── Report.tsx           # Investigation report page
+├── hooks/
+│   └── useGraphData.ts     # Graph data processing hook
 convex/
-├── schema.ts            # Tables: investigations, findings, steps
+├── schema.ts            # Tables: investigations, findings, steps, graph_edges
 ├── investigations.ts    # CRUD + queries
-├── orchestrator.ts      # Opus agentic loop (think → tool → execute → next)
+├── orchestrator.ts      # Agentic loop (Sonnet for steps, Opus for reports)
 ├── reports.ts           # Report assembly
 └── tools/
-    ├── braveSearch.ts   # Brave Search API (fast web lookups)
-    ├── browserUse.ts    # Browser Use Cloud API
-    ├── maigret.ts       # Calls sidecar
-    └── picarta.ts       # Picarta AI photo geolocation
+    ├── braveSearch.ts       # Brave Search API (fast web lookups)
+    ├── browserUse.ts        # Browser Use Cloud API v3
+    ├── maigret.ts           # Username OSINT (calls Python sidecar)
+    ├── picarta.ts           # Picarta AI photo geolocation
+    ├── geoSpy.ts            # GeoSpy AI photo geolocation
+    ├── reverseImageSearch.ts # Google Lens via SerpAPI
+    ├── whitePages.ts        # Person lookup (extreme mode)
+    └── intelx.ts            # Dark web / breach search (extreme mode)
 sidecar/
 ├── server.py            # FastAPI wrapper for Maigret CLI
 └── requirements.txt
@@ -67,11 +83,17 @@ Frontend (`.env.local`):
 - `VITE_CONVEX_URL` — Convex deployment URL (auto-set by `npx convex dev`)
 
 Convex dashboard (Settings → Environment Variables):
-- `ANTHROPIC_API_KEY` — Claude API key for orchestrator
-- `BROWSER_USE_API_KEY` — Browser Use Cloud API key
-- `BRAVE_API_KEY` — Brave Search API key (for fast web lookups)
-- `PICARTA_API_KEY` — Picarta AI geolocation API key (free tier: 100 calls/month)
+- `ANTHROPIC_API_KEY` — Claude API key for orchestrator (required)
+- `BROWSER_USE_API_KEY` — Browser Use Cloud API key (required)
+- `BRAVE_API_KEY` — Brave Search API key (required)
+- `PICARTA_API_KEY` — Picarta AI geolocation (free tier: 100 calls/month)
+- `GEOSPY_API_KEY` — GeoSpy AI geolocation
+- `SERPAPI_API_KEY` — SerpAPI for reverse image search (Google Lens)
+- `WHITEPAGES_API_KEY` — WhitePages person lookup (extreme mode only)
+- `INTELX_API_KEY` — IntelX dark web search (extreme mode only)
 - `MAIGRET_SIDECAR_URL` — Maigret sidecar URL (optional, defaults to `http://localhost:8000`)
+
+Note: Missing API keys are handled gracefully — the tool returns an error message to the LLM which then skips it and uses alternatives.
 
 ## Boundaries
 
