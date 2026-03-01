@@ -14,7 +14,8 @@ export default defineSchema({
       v.literal("investigating"),
       v.literal("analyzing"),
       v.literal("complete"),
-      v.literal("failed")
+      v.literal("failed"),
+      v.literal("stopped")
     ),
     browserSessionId: v.optional(v.string()),
     browserLiveUrl: v.optional(v.string()),
