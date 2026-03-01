@@ -228,6 +228,16 @@ export const step = internalAction({
     }
 
     const data = await response.json();
+
+    // Track token usage
+    if (data.usage) {
+      await ctx.runMutation(api.investigations.updateTokenUsage, {
+        id: args.investigationId,
+        inputTokens: data.usage.input_tokens ?? 0,
+        outputTokens: data.usage.output_tokens ?? 0,
+      });
+    }
+
     const stepNumber = await ctx.runMutation(api.investigations.incrementStep, {
       id: args.investigationId,
     });
@@ -495,6 +505,16 @@ Format as markdown. Be thorough and professional.`,
   }
 
   const data = await response.json();
+
+  // Track token usage for report generation
+  if (data.usage) {
+    await ctx.runMutation(api.investigations.updateTokenUsage, {
+      id: investigationId as any,
+      inputTokens: data.usage.input_tokens ?? 0,
+      outputTokens: data.usage.output_tokens ?? 0,
+    });
+  }
+
   const report =
     data.content.find((b: { type: string }) => b.type === "text")?.text || "";
 

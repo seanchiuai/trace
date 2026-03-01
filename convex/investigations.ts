@@ -163,6 +163,27 @@ export const addFinding = mutation({
   },
 });
 
+export const updateTokenUsage = mutation({
+  args: {
+    id: v.id("investigations"),
+    inputTokens: v.number(),
+    outputTokens: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const investigation = await ctx.db.get(args.id);
+    if (!investigation) return;
+    const totalInput = (investigation.totalInputTokens ?? 0) + args.inputTokens;
+    const totalOutput = (investigation.totalOutputTokens ?? 0) + args.outputTokens;
+    // Opus pricing: $15/M input, $75/M output
+    const cost = (totalInput / 1_000_000) * 15 + (totalOutput / 1_000_000) * 75;
+    await ctx.db.patch(args.id, {
+      totalInputTokens: totalInput,
+      totalOutputTokens: totalOutput,
+      estimatedCost: Math.round(cost * 10000) / 10000,
+    });
+  },
+});
+
 export const generateUploadUrl = mutation({
   handler: async (ctx) => {
     return await ctx.storage.generateUploadUrl();
