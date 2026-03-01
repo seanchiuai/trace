@@ -1,3 +1,4 @@
+import { type ReactNode } from "react";
 import { motion } from "framer-motion";
 
 export type ViewMode = "browser" | "graph" | "map";
@@ -9,7 +10,7 @@ interface Props {
   hasLocations: boolean;
 }
 
-const views: { id: ViewMode; label: string; icon: JSX.Element }[] = [
+const views: { id: ViewMode; label: string; icon: ReactNode }[] = [
   {
     id: "browser",
     label: "Browser",

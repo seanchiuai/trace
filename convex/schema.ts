@@ -58,6 +58,16 @@ export default defineSchema({
     createdAt: v.number(),
   }).index("by_investigation", ["investigationId"]),
 
+  directives: defineTable({
+    investigationId: v.id("investigations"),
+    type: v.union(v.literal("kill_lead"), v.literal("general")),
+    findingId: v.optional(v.id("findings")),
+    message: v.string(),
+    acknowledged: v.boolean(),
+    createdAt: v.number(),
+  }).index("by_investigation", ["investigationId"])
+    .index("by_investigation_pending", ["investigationId", "acknowledged"]),
+
   clarifications: defineTable({
     investigationId: v.id("investigations"),
     question: v.string(),

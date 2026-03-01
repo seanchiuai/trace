@@ -20,26 +20,26 @@ function buildSystemPrompt(maigretAvailable: boolean, extremeMode: boolean = fal
   let n = 1;
   if (maigretAvailable) {
     toolLines.push(
-      `${n++}. maigret_search(username) — OSINT search across 3,000+ sites. AI extracts connected handles from bios/metadata and auto-searches those leads. Returns profiles, leads, connection graph. High-value first move when you have a username.`
+      `${n++}. maigret_search(username) - OSINT search across 3,000+ sites. AI extracts connected handles from bios/metadata and auto-searches those leads. Returns profiles, leads, connection graph. High-value first move when you have a username.`
     );
   }
   toolLines.push(
-    `${n++}. browser_action(instruction) — Control a real browser. Returns page text. SLOW (~60-180s) and LIMITED to ${MAX_BROWSER_ACTIONS} uses per investigation. See BROWSER RULES and LOGIN WALL AVOIDANCE below.`,
-    `${n++}. web_search(query, count?) — Fast web search (<1s). Returns titles, URLs, snippets. YOUR DEFAULT TOOL for lookups.`,
-    `${n++}. geospy_predict(imageUrl) — AI photo geolocation. Returns GPS, city, country, visual clue explanation.`,
-    `${n++}. geo_locate(imageUrl) — Picarta AI geolocation. Returns coordinates, confidence, EXIF, top-3 predictions.`,
-    `${n++}. reverse_image_search(imageUrl) — Find where a photo appears online. Returns visual matches, knowledge graph, OCR text.`
+    `${n++}. browser_action(instruction) - Control a real browser. Returns page text. SLOW (~60-180s) and LIMITED to ${MAX_BROWSER_ACTIONS} uses per investigation. See BROWSER RULES and LOGIN WALL AVOIDANCE below.`,
+    `${n++}. web_search(query, count?) - Fast web search (<1s). Returns titles, URLs, snippets. YOUR DEFAULT TOOL for lookups.`,
+    `${n++}. geospy_predict(imageUrl) - AI photo geolocation. Returns GPS, city, country, visual clue explanation.`,
+    `${n++}. geo_locate(imageUrl) - Picarta AI geolocation. Returns coordinates, confidence, EXIF, top-3 predictions.`,
+    `${n++}. reverse_image_search(imageUrl) - Find where a photo appears online. Returns visual matches, knowledge graph, OCR text.`
   );
   if (extremeMode) {
     toolLines.push(
-      `${n++}. whitepages_lookup(name?, phone?, city?, stateCode?) — Deep person lookup. Returns addresses, age, phones, associates.`,
-      `${n++}. darkweb_search(term, maxResults?) — Search leaked databases and paste sites for emails, usernames, phones.`
+      `${n++}. whitepages_lookup(name?, phone?, city?, stateCode?) - Deep person lookup. Returns addresses, age, phones, associates.`,
+      `${n++}. darkweb_search(term, maxResults?) - Search leaked databases and paste sites for emails, usernames, phones.`
     );
   }
   toolLines.push(
-    `${n++}. save_finding(source, category, platform, data, confidence, imageUrl?, profileUrl?) — Save a confirmed finding. Categories: "social", "connection", "location", "activity", "identity". FREE — does not count toward your step budget. Save liberally. Always include imageUrl when you have one.`,
-    `${n++}. ask_user(question, options, context?) — Ask the user a clarifying question with 2-4 selectable options. Use when results are ambiguous and a quick answer would save multiple steps (e.g. "Found 12 John Smiths — which city are they likely in?"). Always include "Not sure" as the last option. FREE — doesn't burn steps.`,
-    `${n++}. done(summary) — End the investigation. Call this when you've gathered enough evidence or are running low on steps.`
+    `${n++}. save_finding(source, category, platform, data, confidence, imageUrl?, profileUrl?) - Save a confirmed finding. Categories: "social", "connection", "location", "activity", "identity". FREE - does not count toward your step budget. Save liberally. Always include imageUrl when you have one.`,
+    `${n++}. ask_user(question, options, context?) - Ask the user a clarifying question with 2-4 selectable options. Use when results are ambiguous and a quick answer would save multiple steps (e.g. "Found 12 John Smiths - which city are they likely in?"). Always include "Not sure" as the last option. FREE - doesn't burn steps.`,
+    `${n++}. done(summary) - End the investigation. Call this when you've gathered enough evidence or are running low on steps.`
   );
 
   return `You are an expert OSINT investigator. You think methodically, follow leads, and build a comprehensive digital footprint.
@@ -47,58 +47,80 @@ function buildSystemPrompt(maigretAvailable: boolean, extremeMode: boolean = fal
 ## TOOLS
 ${toolLines.join("\n")}
 
-## BROWSER RULES — READ CAREFULLY
+## BROWSER RULES - READ CAREFULLY
 browser_action is your LAST RESORT, not your default. Follow this decision tree:
-1. Can web_search answer this? (LinkedIn profiles, GitHub pages, news articles, public pages) → Use web_search
-2. Does the page require JavaScript rendering, scrolling, or interaction? → Use browser_action
-3. Did web_search return no useful results AND you need to see the actual page? → Use browser_action
-4. Did browser_action just fail/timeout? → NEVER retry browser. Switch to web_search.
+1. Can web_search answer this? (LinkedIn profiles, GitHub pages, news articles, public pages) -> Use web_search
+2. Does the page require JavaScript rendering, scrolling, or interaction? -> Use browser_action
+3. Did web_search return no useful results AND you need to see the actual page? -> Use browser_action
+4. Did browser_action just fail/timeout? -> NEVER retry browser. Switch to web_search.
 
-NEVER use browser_action for: LinkedIn, GitHub, Facebook public pages, news articles, Wikipedia — web_search gets the same data 250x faster.
+NEVER use browser_action for: LinkedIn, GitHub, Facebook public pages, news articles, Wikipedia - web_search gets the same data 250x faster.
 ONLY use browser_action for: imginn.com (Instagram proxy), urlebird.com (TikTok proxy), pages requiring interaction.
 
 ## LOGIN WALL AVOIDANCE
-NEVER visit these sites directly in browser_action — use alternatives:
-- Instagram → imginn.com/username or picuki.com/profile/username (public viewer, no login)
-- TikTok → urlebird.com/user/username (public viewer, no login)
-- Facebook → web_search "site:facebook.com name" for cached data; or mbasic.facebook.com/username
-- LinkedIn → web_search "site:linkedin.com/in/ name title" (Google caches public profiles; NEVER browse directly)
-- Twitter/X → nitter.net/username or xcancel.com/username; fall back to web_search "site:x.com username"
-- Pinterest → web_search "site:pinterest.com username"; or browse pinterest.com/username/ (usually public)
-- Reddit → old.reddit.com/user/username (no login needed)
+NEVER visit these sites directly in browser_action - use alternatives:
+- Instagram -> imginn.com/username or picuki.com/profile/username (public viewer, no login)
+- TikTok -> urlebird.com/user/username (public viewer, no login)
+- Facebook -> web_search "site:facebook.com name" for cached data; or mbasic.facebook.com/username
+- LinkedIn -> web_search "site:linkedin.com/in/ name title" (Google caches public profiles; NEVER browse directly)
+- Twitter/X -> nitter.net/username or xcancel.com/username; fall back to web_search "site:x.com username"
+- Pinterest -> web_search "site:pinterest.com username"; or browse pinterest.com/username/ (usually public)
+- Reddit -> old.reddit.com/user/username (no login needed)
 
 ## PARALLEL EXECUTION
 <use_parallel_tool_calls>
-ALWAYS invoke independent tools simultaneously. If you need 3 web searches, call all 3 at once — not one at a time.
+ALWAYS invoke independent tools simultaneously. If you need 3 web searches, call all 3 at once - not one at a time.
 Combine save_finding calls with your next research action in the same turn.
 </use_parallel_tool_calls>
 
-## STRATEGY — PHASE-BASED APPROACH
-Adapt to what you know. Each step is precious — make it count.
+## STRATEGY - PHASE-BASED APPROACH
+Adapt to what you know. Each step is precious - make it count.
 
-**Phase 1 — Cast the Net (Steps 1-5):**
-${maigretAvailable ? "- Username known → start with maigret_search (wide OSINT net)" : ""}
-- Name only → parallel web_search: "Name LinkedIn", "Name Twitter", "Name Instagram", "Name GitHub"
-- Common name → add description details (city, job, age) to searches; use ask_user if results are ambiguous
-- Photo available → parallel: geospy_predict + reverse_image_search
-- Links provided → web_search each link for context
-${extremeMode ? "- Email/username → darkweb_search for breach records" : ""}
+**Phase 1 - Cast the Net (Steps 1-5):**
+${maigretAvailable ? "- Username known -> start with maigret_search (wide OSINT net)" : ""}
+- Name only -> parallel web_search: "Name LinkedIn", "Name Twitter", "Name Instagram", "Name GitHub"
+- Common name -> add description details (city, job, age) to searches; use ask_user if results are ambiguous
+- Photo available -> parallel: geospy_predict + reverse_image_search
+- Links provided -> web_search each link for context
+${extremeMode ? "- Email/username -> darkweb_search for breach records" : ""}
 
-**Phase 2 — Follow Leads (Steps 6-14):**
+**Phase 2 - Follow Leads (Steps 6-14):**
 - Cross-reference findings: verify identities across platforms
 - Explore confirmed profiles deeper (web_search first, browser only if needed)
 - Search for connections between discovered accounts
-- Target demographics: younger → TikTok/Instagram/Discord; professional → LinkedIn/GitHub
+- Target demographics: younger -> TikTok/Instagram/Discord; professional -> LinkedIn/GitHub
 
-**Phase 3 — Verify & Wrap Up (Steps 15-20):**
+**Phase 3 - Verify & Wrap Up (Steps 15-20):**
 - Verify uncertain findings, fill gaps in the profile
 - Ensure all confirmed findings are saved
 - Call done() with a comprehensive summary
 
+## LEAD VALIDATION - CRITICAL (avoid false positives)
+- Never assume a profile belongs to the target just because the name or username matches
+- Before saving a finding, require 2+ independent corroborating signals (e.g. same name + same city, cross-linked accounts, matching photo)
+- Maigret false-positive warning: common usernames match many unrelated accounts - always verify profile content before attribution
+- Check profile content (bio, photos, location, activity dates) before attributing to target
+- A username match alone is NOT sufficient - look for bio details, location, connections, or photos that corroborate
+- If a profile contradicts known info (wrong city, wrong age, wrong profession), do NOT save it as a finding
+- When in doubt, note the lead but mark confidence low and explain why attribution is uncertain
+
+## SELF-ASSESSMENT CHECKPOINTS
+- Every 3-4 tool calls, pause and verify: "Am I still investigating the right person?"
+- Ask: "Do my findings corroborate each other, or am I mixing up different people?"
+- When to abandon a lead: no corroborating info after 2 searches, or profile details contradict known info
+- When to pursue deeper: multiple signals align, cross-linked accounts, unique identifiers match
+- Explicitly state "Abandoning this lead because..." when you redirect to prevent re-exploring dead ends
+
+## DIRECTIVE AWARENESS
+- A human investigator may inject KILL LEAD directives during the investigation
+- When you see a KILL LEAD directive, immediately stop ALL activity related to that lead
+- Never re-search, reference, or save findings about killed leads
+- Trust the human operator's judgment and redirect your efforts to other leads
+
 ## ERROR RECOVERY
 - If a tool returns an error, DO NOT retry the same tool with the same input
-- If browser_action fails → switch to web_search for that URL/query
-- If web_search returns empty → try different query terms, not browser_action
+- If browser_action fails -> switch to web_search for that URL/query
+- If web_search returns empty -> try different query terms, not browser_action
 - After 2+ consecutive errors, reassess your approach entirely
 
 ## DEDUPLICATION
@@ -111,7 +133,7 @@ Before each action, review your previous steps. Do NOT:
 - Save findings AS you discover them (it's free)
 - When you find images, ALWAYS include imageUrl in save_finding
 - Explain your reasoning briefly before each action
-- Quality over quantity — one good verified finding beats five unverified ones`;
+- Quality over quantity - one good verified finding beats five unverified ones`;
 }
 
 function buildStepContext(params: {
@@ -141,7 +163,7 @@ function buildStepContext(params: {
   }
 
   if (params.consecutiveErrors >= 2) {
-    parts.push(`[${params.consecutiveErrors} consecutive errors. Reassess your approach — try a different tool or query.]`);
+    parts.push(`[${params.consecutiveErrors} consecutive errors. Reassess your approach - try a different tool or query.]`);
   }
 
   return parts.join("\n");
@@ -228,7 +250,7 @@ const TOOL_DEFINITIONS = [
   {
     name: "geospy_predict",
     description:
-      "AI geolocation — upload a photo and get predicted GPS coordinates, city, country, and an explanation of visual clues. Use on any photo that might reveal a location.",
+      "AI geolocation - upload a photo and get predicted GPS coordinates, city, country, and an explanation of visual clues. Use on any photo that might reveal a location.",
     input_schema: {
       type: "object",
       properties: {
@@ -255,7 +277,7 @@ const TOOL_DEFINITIONS = [
   {
     name: "whitepages_lookup",
     description:
-      "Deep person lookup — search by name, phone number, or both. Returns real addresses, age, phone numbers, and associated people. EXTREME MODE ONLY.",
+      "Deep person lookup - search by name, phone number, or both. Returns real addresses, age, phone numbers, and associated people. EXTREME MODE ONLY.",
     input_schema: {
       type: "object",
       properties: {
@@ -269,7 +291,7 @@ const TOOL_DEFINITIONS = [
   {
     name: "reverse_image_search",
     description:
-      "Reverse image search — find where a photo appears online. Returns visual matches (pages containing the image), knowledge graph identity, and text found in/near the image. Use on any photo of the target to find social profiles, news articles, or other appearances.",
+      "Reverse image search - find where a photo appears online. Returns visual matches (pages containing the image), knowledge graph identity, and text found in/near the image. Use on any photo of the target to find social profiles, news articles, or other appearances.",
     input_schema: {
       type: "object",
       properties: {
@@ -302,7 +324,7 @@ const TOOL_DEFINITIONS = [
   },
   {
     name: "save_finding",
-    description: "Save a confirmed finding from the investigation. FREE — does not count toward your step budget.",
+    description: "Save a confirmed finding from the investigation. FREE - does not count toward your step budget.",
     input_schema: {
       type: "object",
       properties: {
@@ -320,7 +342,7 @@ const TOOL_DEFINITIONS = [
   {
     name: "ask_user",
     description:
-      "Ask the user a clarifying question when you're stuck or results are ambiguous. Present 2-4 clear options. Use sparingly — only when disambiguation would save multiple wasted steps. Examples: 'Multiple John Smiths found — which city?', 'Is this the right person?' FREE — does not count toward step budget.",
+      "Ask the user a clarifying question when you're stuck or results are ambiguous. Present 2-4 clear options. Use sparingly - only when disambiguation would save multiple wasted steps. Examples: 'Multiple John Smiths found - which city?', 'Is this the right person?' FREE - does not count toward step budget.",
     input_schema: {
       type: "object",
       properties: {
@@ -364,7 +386,7 @@ export const startInvestigation = action({
       const health = await ctx.runAction(internal.tools.maigret.healthCheck, {});
       maigretAvailable = health.healthy === true;
     } catch {
-      // Sidecar unreachable — will be excluded from tools
+      // Sidecar unreachable - will be excluded from tools
     }
     console.log(`Maigret sidecar health check: ${maigretAvailable ? "available" : "unavailable"}`);
 
@@ -437,9 +459,57 @@ export const step = internalAction({
       return;
     }
 
-    const conversationHistory = JSON.parse(args.conversationHistory);
+    let conversationHistory = JSON.parse(args.conversationHistory);
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) throw new Error("ANTHROPIC_API_KEY not set");
+
+    // --- Directive injection ---
+    const pendingDirectives = await ctx.runQuery(api.directives.getPendingDirectives, {
+      investigationId: args.investigationId,
+    });
+
+    if (pendingDirectives.length > 0) {
+      const directiveLines = pendingDirectives.map((d: { type: string; message: string; _id: string }) => {
+        if (d.type === "kill_lead") {
+          return `OPERATOR DIRECTIVE: KILL LEAD. Stop pursuing: ${d.message}`;
+        }
+        return `OPERATOR DIRECTIVE: ${d.message}`;
+      });
+      const directiveText = `[HUMAN OPERATOR DIRECTIVES]\n\n${directiveLines.join("\n\n")}`;
+
+      const lastMsg = conversationHistory[conversationHistory.length - 1];
+      if (lastMsg?.role === "user" && Array.isArray(lastMsg.content)) {
+        // Last message is tool_results array - append directive as text block
+        lastMsg.content.push({ type: "text", text: directiveText });
+      } else if (lastMsg?.role === "assistant") {
+        // Add new user message with directive
+        conversationHistory.push({ role: "user", content: directiveText });
+      } else {
+        // Fallback: add as new user message
+        conversationHistory.push({ role: "user", content: directiveText });
+      }
+
+      // Acknowledge directives
+      await ctx.runMutation(api.directives.acknowledgeDirectives, {
+        directiveIds: pendingDirectives.map((d: { _id: string }) => d._id),
+      });
+
+      // Log directive step
+      await ctx.runMutation(api.investigations.addStep, {
+        investigationId: args.investigationId,
+        stepNumber: investigation.stepCount + 1,
+        action: `Human operator directive: ${directiveLines.join("; ").slice(0, 400)}`,
+        tool: "directive",
+      });
+    }
+
+    // Build killed leads list (all kill_lead directives, including already acknowledged)
+    const allDirectives = await ctx.runQuery(api.directives.getDirectives, {
+      investigationId: args.investigationId,
+    });
+    const killedLeads = allDirectives
+      .filter((d: { type: string }) => d.type === "kill_lead")
+      .map((d: { message: string }) => d.message);
 
     const maigretAvailable = args.maigretAvailable ?? false;
     const extremeMode = args.extremeMode ?? false;
@@ -491,7 +561,7 @@ export const step = internalAction({
         "content-type": "application/json",
       },
       body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
+        model: "claude-opus-4-20250514",
         max_tokens: 4096,
         system: buildSystemPrompt(maigretAvailable, extremeMode),
         messages: messagesWithContext,
@@ -532,7 +602,7 @@ export const step = internalAction({
       }
     }
 
-    // Log reasoning step (non-blocking — fire and continue)
+    // Log reasoning step (non-blocking - fire and continue)
     const reasoningPromise = reasoning
       ? ctx.runMutation(api.investigations.addStep, {
           investigationId: args.investigationId,
@@ -554,17 +624,19 @@ export const step = internalAction({
       return;
     }
 
-    // Handle ask_user — pause the loop and wait for user response
+    // Handle ask_user - pause the loop and wait for user response
     const askUserCall = toolCalls.find((tc) => tc.tool === "ask_user");
     if (askUserCall) {
       await reasoningPromise;
       const askArgs = askUserCall.args as { question: string; options: string[]; context?: string };
 
+      // Build the frozen conversation history (include assistant's response with the ask_user call)
       const frozenHistory = [
         ...conversationHistory,
         { role: "assistant", content: data.content },
       ];
 
+      // Create clarification record (mutation sets status to "awaiting_input")
       await ctx.runMutation(api.investigations.createClarification, {
         investigationId: args.investigationId,
         question: askArgs.question,
@@ -576,6 +648,7 @@ export const step = internalAction({
         extremeMode: args.extremeMode ?? false,
       });
 
+      // Log the question as a step
       await ctx.runMutation(api.investigations.addStep, {
         investigationId: args.investigationId,
         stepNumber,
@@ -583,7 +656,7 @@ export const step = internalAction({
         tool: "ask_user",
       });
 
-      // DON'T schedule next step — wait for user response
+      // DON'T schedule next step - wait for user response
       return;
     }
 
@@ -592,7 +665,7 @@ export const step = internalAction({
     const toolResults: { id: string; tool: string; result: string }[] = [];
     let hasNonSaveFinding = false;
 
-    // Pre-compute step number — no need to re-query per tool
+    // Pre-compute step number - no need to re-query per tool
     let currentStepNumber = stepNumber;
     for (const tc of toolCalls) {
       if (tc.tool !== "save_finding") {
@@ -603,6 +676,7 @@ export const step = internalAction({
       currentStepNumber = stepNumber + 1;
     }
 
+    // Separate browser_action calls (must be sequential - shared session) from parallelizable tools
     const browserCalls = toolCalls.filter((tc) => tc.tool === "browser_action");
     const parallelCalls = toolCalls.filter((tc) => tc.tool !== "browser_action");
 
@@ -704,7 +778,7 @@ export const step = internalAction({
       { role: "user", content: toolResultBlocks },
     ];
 
-    const { history: finalHistory, compressionTokens } = await compressHistory(updatedHistory);
+    const { history: finalHistory, compressionTokens } = await compressHistory(updatedHistory, killedLeads);
 
     if (compressionTokens) {
       await ctx.runMutation(api.investigations.updateTokenUsage, {
@@ -745,7 +819,7 @@ async function executeToolCall(
         await ctx.runMutation(api.investigations.addStep, {
           investigationId,
           stepNumber,
-          action: `Running intelligent OSINT search for "${toolCall.args.username}" — searching 3,000+ sites, extracting leads via AI, following connections`,
+          action: `Running intelligent OSINT search for "${toolCall.args.username}" - searching 3,000+ sites, extracting leads via AI, following connections`,
           tool: "maigret",
         });
         const investigateResult = await ctx.runAction(internal.tools.maigret.investigate, {
@@ -763,7 +837,7 @@ async function executeToolCall(
               source: "maigret",
               category: "connection",
               platform: lead.platform || undefined,
-              data: `Lead extracted: @${lead.username}${lead.platform ? ` on ${lead.platform}` : ""} — ${lead.reason}`,
+              data: `Lead extracted: @${lead.username}${lead.platform ? ` on ${lead.platform}` : ""} - ${lead.reason}`,
               confidence: 70,
             });
           }
@@ -816,7 +890,7 @@ async function executeToolCall(
 
         const toolResult = browserResult?.output ?? JSON.stringify(browserResult);
 
-        // v3: runTask returns sessionId + liveUrl directly — always update
+        // v3: runTask returns sessionId + liveUrl directly - always update
         if (browserResult?.sessionId) {
           await ctx.runMutation(api.investigations.updateBrowserSession, {
             id: investigationId,
@@ -962,7 +1036,7 @@ async function executeToolCall(
             source: "reverse_image_search",
             category: "identity",
             profileUrl: risResult.knowledgeGraph.link || undefined,
-            data: `Identified via reverse image: ${risResult.knowledgeGraph.title}${risResult.knowledgeGraph.subtitle ? ` — ${risResult.knowledgeGraph.subtitle}` : ""}${risResult.knowledgeGraph.description ? `. ${risResult.knowledgeGraph.description}` : ""}`,
+            data: `Identified via reverse image: ${risResult.knowledgeGraph.title}${risResult.knowledgeGraph.subtitle ? ` - ${risResult.knowledgeGraph.subtitle}` : ""}${risResult.knowledgeGraph.description ? `. ${risResult.knowledgeGraph.description}` : ""}`,
             confidence: 75,
           });
         }
@@ -1056,9 +1130,10 @@ interface CompressionResult {
 }
 
 async function compressHistory(
-  conversationHistory: Array<Record<string, unknown>>
+  conversationHistory: Array<Record<string, unknown>>,
+  killedLeads?: string[]
 ): Promise<CompressionResult> {
-  // Early return for small histories — skip serialization entirely
+  // Early return for small histories - skip serialization entirely
   if (conversationHistory.length < 6) {
     return { history: conversationHistory };
   }
@@ -1141,7 +1216,7 @@ Summarize the following investigation steps concisely. Include:
 4. **What's been explored**: So the investigator doesn't repeat work
 5. **Dead ends**: Anything tried that yielded nothing
 
-Be concise but preserve all actionable intelligence. No raw tool output — only meaningful findings and conclusions.
+Be concise but preserve all actionable intelligence. No raw tool output - only meaningful findings and conclusions.
 
 Steps to summarize:
 ${summaryInput}`,
@@ -1179,7 +1254,7 @@ ${summaryInput}`,
         history: [
           {
             role: "user",
-            content: `${originalMessage.content as string}\n\n---\n\n[INVESTIGATION PROGRESS — Steps 1-${Math.floor(adjustedCutoff / 2)} compressed]\n\n${summary}\n\n[End of progress summary. Recent steps follow.]`,
+            content: `${originalMessage.content as string}\n\n---\n\n[INVESTIGATION PROGRESS - Steps 1-${Math.floor(adjustedCutoff / 2)} compressed]\n\n${summary}${killedLeads && killedLeads.length > 0 ? `\n\n[KILLED LEADS - Do NOT pursue these]\n${killedLeads.map((l) => `- ${l}`).join("\n")}` : ""}\n\n[End of progress summary. Recent steps follow.]`,
           },
           ...adjustedRecent,
         ],
@@ -1192,7 +1267,7 @@ ${summaryInput}`,
     const compressedHistory: Array<Record<string, unknown>> = [
       {
         role: "user",
-        content: `${originalMessage.content as string}\n\n---\n\n[INVESTIGATION PROGRESS — Steps 1-${Math.floor(cutoffIndex / 2)} compressed]\n\n${summary}\n\n[End of progress summary. Recent steps follow.]`,
+        content: `${originalMessage.content as string}\n\n---\n\n[INVESTIGATION PROGRESS - Steps 1-${Math.floor(cutoffIndex / 2)} compressed]\n\n${summary}${killedLeads && killedLeads.length > 0 ? `\n\n[KILLED LEADS - Do NOT pursue these]\n${killedLeads.map((l) => `- ${l}`).join("\n")}` : ""}\n\n[End of progress summary. Recent steps follow.]`,
       },
       ...recentMessages,
     ];
@@ -1303,7 +1378,7 @@ Respond with ONLY a valid JSON object (no markdown, no code fences) with these f
   "predictedHandles": ["Predicted handles on platforms not yet found, based on username patterns"],
   "interestClusters": ["Groups of interests/topics based on profile bios, follows, and activity"],
   "platformAgeEstimation": "Estimated time period the person has been active online",
-  "behavioralNotes": ["Key behavioral observations — posting frequency, content type preferences, engagement patterns, privacy level"]
+  "behavioralNotes": ["Key behavioral observations - posting frequency, content type preferences, engagement patterns, privacy level"]
 }
 
 If you cannot determine a field, use null or an empty array. Base analysis ONLY on the provided findings.`,
@@ -1338,7 +1413,7 @@ If you cannot determine a field, use null or an empty array. Base analysis ONLY 
 
   const report = reportData.content.find((b: { type: string }) => b.type === "text")?.text || "";
 
-  // Handle behavioral analysis result (non-critical — don't fail on error)
+  // Handle behavioral analysis result (non-critical - don't fail on error)
   if (behavioralResult.status === "fulfilled" && behavioralResult.value.ok) {
     try {
       const behavioralData = await behavioralResult.value.json();
@@ -1414,7 +1489,7 @@ function formatInvestigationForOpus(result: {
   if (result.leads_extracted.length > 0) {
     sections.push(`\n--- Extracted Leads (${result.leads_extracted.length} found) ---`);
     for (const lead of result.leads_extracted) {
-      sections.push(`• @${lead.username}${lead.platform ? ` (${lead.platform})` : ""} — ${lead.reason}`);
+      sections.push(`• @${lead.username}${lead.platform ? ` (${lead.platform})` : ""} - ${lead.reason}`);
     }
   }
 
@@ -1428,7 +1503,7 @@ function formatInvestigationForOpus(result: {
         const p = profile as Record<string, unknown>;
         const line = [`  ${(p.site_name as string) || site}: ${p.url as string}`];
         if (p.fullname) line.push(`(${p.fullname})`);
-        if (p.bio) line.push(`— "${(p.bio as string).slice(0, 100)}"`);
+        if (p.bio) line.push(`- "${(p.bio as string).slice(0, 100)}"`);
         sections.push(line.join(" "));
       }
     }
@@ -1477,7 +1552,10 @@ export const resumeFromClarification = action({
     const clar = await ctx.runQuery(api.investigations.getClarification, { id: args.clarificationId });
     if (!clar || clar.status !== "answered") return;
 
+    // Restore frozen conversation + inject user response as tool_result
     const frozenHistory = JSON.parse(clar.conversationHistory);
+
+    // Find the ask_user tool_use block in the last assistant message to get its ID
     const lastAssistant = frozenHistory[frozenHistory.length - 1];
 
     const toolResultBlocks = lastAssistant.content
@@ -1486,7 +1564,8 @@ export const resumeFromClarification = action({
         if (b.name === "ask_user") {
           return { type: "tool_result", tool_use_id: b.id, content: `User answered: "${clar.response}"` };
         }
-        return { type: "tool_result", tool_use_id: b.id, content: "Skipped — paused for user clarification" };
+        // For any other tool calls in the same message, return a skip result
+        return { type: "tool_result", tool_use_id: b.id, content: "Skipped - paused for user clarification" };
       });
 
     const resumedHistory = [
@@ -1494,11 +1573,13 @@ export const resumeFromClarification = action({
       { role: "user", content: toolResultBlocks },
     ];
 
+    // Set status back to "investigating"
     await ctx.runMutation(api.investigations.updateStatus, {
       id: clar.investigationId,
       status: "investigating",
     });
 
+    // Resume the loop
     await ctx.scheduler.runAfter(0, internal.orchestrator.step, {
       investigationId: clar.investigationId,
       conversationHistory: JSON.stringify(resumedHistory),

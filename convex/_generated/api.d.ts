@@ -8,6 +8,7 @@
  * @module
  */
 
+import type * as directives from "../directives.js";
 import type * as graphEdges from "../graphEdges.js";
 import type * as investigations from "../investigations.js";
 import type * as orchestrator from "../orchestrator.js";
@@ -28,6 +29,7 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  directives: typeof directives;
   graphEdges: typeof graphEdges;
   investigations: typeof investigations;
   orchestrator: typeof orchestrator;
