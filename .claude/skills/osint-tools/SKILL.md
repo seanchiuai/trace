@@ -1,15 +1,13 @@
 ---
 name: osint-tools
-description: Maigret username OSINT and Supermemory investigation memory
 ---
 
 # OSINT Tools
 
 ## Overview
 
-Two external tools for open-source intelligence gathering:
+External tool for open-source intelligence gathering:
 - **Maigret** — Username enumeration across 3,000+ sites (runs as a local Python sidecar)
-- **Supermemory** — Persistent memory store for investigation context across steps
 
 ## Maigret
 
@@ -88,35 +86,6 @@ pip install -r requirements.txt   # maigret, fastapi, uvicorn
 python server.py                   # → http://localhost:8000
 ```
 
-## Supermemory
-
-### Purpose
-
-Persists investigation context across orchestrator steps. Opus can store findings and recall relevant memories before making decisions.
-
-### API
-
-Base URL: `https://api.supermemory.com/v1`
-
-Auth: `Authorization: Bearer {SUPERMEMORY_API_KEY}`
-
-### Functions
-
-Located in `convex/tools/supermemory.ts`:
-
-| Function | Endpoint | Purpose |
-|----------|----------|---------|
-| `store` | POST `/memories` | Save data with key + investigation ID |
-| `recall` | POST `/search` | Query memories filtered by investigation ID |
-
-### Non-blocking
-
-Both functions are non-blocking — if `SUPERMEMORY_API_KEY` is not set, they log a warning and return empty results. The investigation works without Supermemory by passing conversation history directly to Opus.
-
-### Cut Candidate
-
-Supermemory is a cut candidate if running low on time. Without it, Opus relies on the accumulated conversation history for context, which works fine for investigations under 20 steps.
-
 ## Files
 
 | File | What |
@@ -124,9 +93,7 @@ Supermemory is a cut candidate if running low on time. Without it, Opus relies o
 | `sidecar/server.py` | FastAPI server wrapping Maigret CLI |
 | `sidecar/requirements.txt` | `maigret`, `fastapi`, `uvicorn[standard]` |
 | `convex/tools/maigret.ts` | `search` internalAction |
-| `convex/tools/supermemory.ts` | `store`, `recall` internalActions |
 
 ## Environment
 
-- `SUPERMEMORY_API_KEY` — Convex dashboard (optional, free tier)
 - Maigret requires Python 3.8+ installed locally

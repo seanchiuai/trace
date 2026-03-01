@@ -71,15 +71,6 @@ AI-powered missing persons investigation tool. User provides name, description, 
 - [ ] Steps stream in real-time via Convex subscription (verified live)
 - [ ] Browser iframe actually loads Browser Use live URL
 
-### US-007: Supermemory Integration
-**As a** system, **I want to** persist investigation memory **so that** the AI retains context across steps.
-
-**Acceptance Criteria:**
-- [x] Convex action stores memories with key + investigation ID
-- [x] Convex action recalls memories by query + investigation ID
-- [ ] Orchestrator stores findings in Supermemory after each step
-- [ ] Orchestrator recalls relevant memories before each decision
-
 ### US-008: Detective Report
 **As a** user, **I want to** see a comprehensive investigation report **so that** I can review all findings in one place.
 

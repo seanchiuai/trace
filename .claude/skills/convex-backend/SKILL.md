@@ -125,7 +125,6 @@ Set in Convex dashboard (Settings → Environment Variables), NOT in `.env`:
 - `ANTHROPIC_API_KEY` — Claude API for orchestrator
 - `BROWSER_USE_API_KEY` — Browser Use Cloud
 - `FACECHECK_API_KEY` — FaceCheck.id
-- `SUPERMEMORY_API_KEY` — Supermemory (optional)
 
 ## Gotchas
 

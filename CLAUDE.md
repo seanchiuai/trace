@@ -26,8 +26,6 @@ cd sidecar && pip install -r requirements.txt && python server.py
 - **Browser Use API** — Cloud browser automation
 - **FaceCheck.id API** — Facial recognition search
 - **Maigret** — Username OSINT (Python sidecar via FastAPI)
-- **Supermemory** — Investigation memory store/recall
-
 ## Architecture
 
 ```
@@ -52,8 +50,7 @@ convex/
 └── tools/
     ├── browserUse.ts    # Browser Use Cloud API
     ├── faceCheck.ts     # FaceCheck.id
-    ├── maigret.ts       # Calls sidecar
-    └── supermemory.ts   # Memory store/recall
+    └── maigret.ts       # Calls sidecar
 sidecar/
 ├── server.py            # FastAPI wrapper for Maigret CLI
 └── requirements.txt
@@ -68,7 +65,6 @@ Convex dashboard (Settings → Environment Variables):
 - `ANTHROPIC_API_KEY` — Claude API key for orchestrator
 - `BROWSER_USE_API_KEY` — Browser Use Cloud API key
 - `FACECHECK_API_KEY` — FaceCheck.id API key
-- `SUPERMEMORY_API_KEY` — Supermemory API key (optional)
 
 ## Boundaries
 
