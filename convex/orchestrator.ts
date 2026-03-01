@@ -75,12 +75,19 @@ If you find an Instagram username or Instagram link at ANY point during this inv
 ${toolLines.join("\n")}
 
 ## BROWSER RULES - READ CAREFULLY
-browser_action controls a REAL browser. Use it strategically — it's slow (~60-180s) but extremely powerful for visual intelligence.
+browser_action controls a REAL browser. It can click links, scroll, interact with pages, and navigate — USE IT ACTIVELY. Do NOT just look at a page. CLICK THROUGH to profiles, posts, links, and subpages to extract maximum intelligence.
 
 Decision tree:
 1. Can web_search answer this? (LinkedIn profiles, GitHub pages, news articles) -> Use web_search first
 2. Need to see photos, posts, stories, location tags, or visual content? -> Use browser_action (this is its strength)
 3. Did browser_action just fail/timeout? -> NEVER retry the same page. Try an alternative URL or switch to web_search.
+
+BROWSER INTERACTION RULES:
+- CLICK on links, profiles, photos, and posts — don't just read the first page
+- SCROLL through entire pages to see all content
+- NAVIGATE to linked profiles, tagged people, and mentioned pages
+- When on imginn, click individual posts to see full captions, location tags, and tagged accounts
+- When you see a link to another profile or page, FOLLOW IT in the same browser session
 
 BEST uses of browser_action: imginn.com (Instagram OSINT — photos, location tags, tagged people, stories), TikTok profiles, any page with visual/interactive content.
 AVOID browser_action for: LinkedIn, GitHub, Wikipedia, news articles - web_search gets the same text data faster.

@@ -139,7 +139,8 @@ export const runTask = internalAction({
     }
 
     const sessionId = created.id;
-    let liveUrl: string | undefined = created.liveUrl;
+    let liveUrl: string | undefined = created.liveUrl ?? created.live_url;
+    console.log(`[browserUse] Session created: id=${sessionId}, liveUrl=${liveUrl ?? "none"}, keys=${Object.keys(created).join(",")}`);
 
     // Push liveUrl to UI immediately so the iframe loads while we poll
     if (liveUrl && args.investigationId) {
@@ -191,9 +192,10 @@ export const runTask = internalAction({
         continue;
       }
 
-      // Capture liveUrl on first available poll
-      if (!liveUrl && session.liveUrl) {
-        liveUrl = session.liveUrl;
+      // Capture liveUrl on first available poll (handle both camelCase and snake_case)
+      const pollLiveUrl = session.liveUrl ?? session.live_url;
+      if (!liveUrl && pollLiveUrl) {
+        liveUrl = pollLiveUrl;
         if (args.investigationId) {
           try {
             await ctx.runMutation(api.investigations.updateBrowserSession, {
@@ -212,7 +214,7 @@ export const runTask = internalAction({
         return {
           output: session.output ?? "Task completed (no output)",
           sessionId,
-          liveUrl: session.liveUrl || liveUrl,
+          liveUrl: session.liveUrl ?? session.live_url ?? liveUrl,
           status: "idle",
         };
       }
@@ -222,7 +224,7 @@ export const runTask = internalAction({
         return {
           output: session.output ?? "Session was stopped before completing",
           sessionId,
-          liveUrl: session.liveUrl || liveUrl,
+          liveUrl: session.liveUrl ?? session.live_url ?? liveUrl,
           status: "stopped",
         };
       }
@@ -234,7 +236,7 @@ export const runTask = internalAction({
             ? `Browser encountered an error: ${session.output}. RECOVERY: Use web_search to find the same information instead.`
             : "Browser session error. RECOVERY: Use web_search as an alternative.",
           sessionId,
-          liveUrl: session.liveUrl || liveUrl,
+          liveUrl: session.liveUrl ?? session.live_url ?? liveUrl,
           status: "error",
         };
       }
@@ -244,7 +246,7 @@ export const runTask = internalAction({
             ? `Browser timed out but captured partial output: ${session.output}. RECOVERY: Use web_search for faster results.`
             : "Browser session timed out. RECOVERY: Use web_search instead — it's 250x faster for simple lookups.",
           sessionId,
-          liveUrl: session.liveUrl || liveUrl,
+          liveUrl: session.liveUrl ?? session.live_url ?? liveUrl,
           status: "timed_out",
         };
       }
