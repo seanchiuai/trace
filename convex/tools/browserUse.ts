@@ -231,22 +231,38 @@ export const runTask = internalAction({
         };
       }
 
-      // Terminal errors
+      // Terminal errors — return gracefully instead of throwing
       if (session.status === "error") {
-        throw new Error(
-          `Browser Use session error: ${session.output || "Unknown error"}`,
-        );
+        return {
+          output: session.output
+            ? `Browser encountered an error: ${session.output}. RECOVERY: Use web_search to find the same information instead.`
+            : "Browser session error. RECOVERY: Use web_search as an alternative.",
+          sessionId,
+          liveUrl: session.liveUrl || liveUrl,
+          status: "error",
+        };
       }
       if (session.status === "timed_out") {
-        throw new Error(
-          `Browser Use session timed out: ${session.output || "Session exceeded time limit"}`,
-        );
+        return {
+          output: session.output
+            ? `Browser timed out but captured partial output: ${session.output}. RECOVERY: Use web_search for faster results.`
+            : "Browser session timed out. RECOVERY: Use web_search instead — it's 250x faster for simple lookups.",
+          sessionId,
+          liveUrl: session.liveUrl || liveUrl,
+          status: "timed_out",
+        };
       }
 
       // "running" or "created" — keep polling
     }
 
-    throw new Error("Browser Use task timed out after polling");
+    // Polling exhausted — return gracefully instead of throwing
+    return {
+      output: "Browser task timed out after extended polling. RECOVERY: Do NOT retry with browser_action. Use web_search instead — it returns results in <1 second.",
+      sessionId,
+      liveUrl,
+      status: "timed_out",
+    };
   },
 });
 
