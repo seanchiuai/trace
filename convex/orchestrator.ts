@@ -23,7 +23,6 @@ function buildSystemPrompt(maigretAvailable: boolean): string {
   }
   toolLines.push(
     `${n++}. browser_action(instruction) — Control a web browser. Give clear instructions like "Go to imginn.com/username and report what you see." IMPORTANT: For Instagram profiles, ALWAYS use imginn.com (e.g. imginn.com/username) instead of instagram.com — it shows public profiles without login walls. Returns screenshots and page text. Use for interactive pages that require scrolling or JS rendering. EXPENSIVE — prefer web_search for simple lookups.`,
-    `${n++}. face_check(imageUrl) — Run facial recognition on an image. Returns matching profiles with confidence scores. Use on group photos or profile pictures.`,
     `${n++}. web_search(query, count?) — Fast web search. Returns titles, URLs, and snippets. Use this FIRST for simple lookups like "John Smith LinkedIn", "username site:twitter.com", company info, news articles, etc. Much faster and cheaper than browser_action.`,
     `${n++}. save_finding(source, category, platform, data, confidence) — Save a confirmed finding. Categories: "social", "connection", "location", "activity", "identity". FREE — does not count toward your step budget. Save findings liberally as you discover them.`,
     `${n++}. done(report) — End the investigation and generate the final report.`
@@ -35,7 +34,7 @@ function buildSystemPrompt(maigretAvailable: boolean): string {
       ? [`  - Username known → start with maigret_search to cast a wide OSINT net`]
       : []),
     `  - Only a name → use web_search to find usernames, profiles, and leads first`,
-    `  - Photo available → consider face_check early to find visual matches`,
+    `  - Photo available → use web_search with image-related queries to find visual matches`,
     `  - Social links provided → explore those profiles directly (web_search or browser_action)`,
     `  - Phone number → search it via web_search`,
     `- Consider the target type and pick platforms accordingly:`,
@@ -95,17 +94,6 @@ const TOOL_DEFINITIONS = [
     },
   },
   {
-    name: "face_check",
-    description: "Run facial recognition on an image URL. Returns matching profiles with confidence scores.",
-    input_schema: {
-      type: "object",
-      properties: {
-        imageUrl: { type: "string", description: "URL of the image to search faces in" },
-      },
-      required: ["imageUrl"],
-    },
-  },
-  {
     name: "web_search",
     description: "Fast web search via Brave Search API. Returns titles, URLs, and snippets. Use for quick lookups instead of browser_action.",
     input_schema: {
@@ -123,7 +111,7 @@ const TOOL_DEFINITIONS = [
     input_schema: {
       type: "object",
       properties: {
-        source: { type: "string", description: 'Where this finding came from: "instagram", "facecheck", "maigret", "browser", "web_search", etc.' },
+        source: { type: "string", description: 'Where this finding came from: "instagram", "maigret", "browser", "web_search", etc.' },
         category: { type: "string", enum: ["social", "connection", "location", "activity", "identity"] },
         platform: { type: "string", description: "Platform name" },
         profileUrl: { type: "string", description: "URL if applicable" },
@@ -436,19 +424,6 @@ async function executeToolCall(
           });
         }
         return toolResult;
-      }
-
-      case "face_check": {
-        await ctx.runMutation(api.investigations.addStep, {
-          investigationId,
-          stepNumber,
-          action: `Running face recognition on image`,
-          tool: "face_check",
-        });
-        const faceResult = await ctx.runAction(internal.tools.faceCheck.searchByImage, {
-          imageUrl: toolCall.args.imageUrl as string,
-        });
-        return JSON.stringify(faceResult);
       }
 
       case "web_search": {

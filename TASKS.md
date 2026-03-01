@@ -8,7 +8,6 @@
 | 2 | Maigret sidecar (FastAPI + wrapper) | Complete |
 | 3 | Browser Use integration | Complete |
 | 4 | Opus orchestrator loop | Complete |
-| 5 | FaceCheck API integration | Complete (code written, needs API key testing) |
 | 6 | Frontend: input form + live browser + activity stream | Complete |
 | 7 | Laminar observability tree | Backlog (cut candidate) |
 | 8 | Detective report generation + UI | Complete |
@@ -24,11 +23,9 @@
 - [x] Create orchestrator with Opus tool loop and report generation
 - [x] Create Browser Use tool actions (create session, run task, get status, get session, stop session)
 - [x] Fix Browser Use API v2 integration (endpoints, auth, polling, session lifecycle)
-- [x] Create FaceCheck tool action (upload, poll, parse results)
 - [x] Create Maigret tool action (calls local sidecar)
 - [x] Create reports query (assembles investigation + findings + steps)
 - [x] Create Maigret Python sidecar (FastAPI server.py + requirements.txt)
-- [x] Create all frontend components (InputForm, BrowserView, ActivityStream, FindingsGrid, FaceScan, DetectiveReport, LeadTree, ImageGallery)
 - [x] Create pages (Home with landing + form, Investigation dashboard)
 - [x] Set up routing (/, /investigate/:id, /report/:id)
 - [x] Set up Convex provider in App.tsx
@@ -70,11 +67,8 @@
 - [ ] Test max step limit enforcement (20 steps)
 - [ ] Test report generation on "done" tool call
 
-### Phase 5: FaceCheck Testing
-- [ ] Sign up for FaceCheck.id API key
 - [ ] Test image upload and polling flow
 - [ ] Verify confidence scores and platform detection
-- [ ] Wire FaceScan overlay to face_check step results
 
 ### Phase 7: Laminar (cut candidate)
 - [ ] Evaluate if Laminar adds enough value for demo

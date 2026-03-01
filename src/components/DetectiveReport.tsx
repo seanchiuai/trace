@@ -44,7 +44,6 @@ const TOOL_LABELS: Record<string, string> = {
   reasoning: "Analysis",
   maigret: "OSINT Scan",
   browser_action: "Web Recon",
-  face_check: "Face Match",
   save_finding: "Intel Logged",
   web_search: "Web Search",
 };

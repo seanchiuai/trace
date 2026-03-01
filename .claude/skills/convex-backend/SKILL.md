@@ -128,7 +128,6 @@ Set in Convex dashboard (Settings → Environment Variables), NOT in `.env`:
 
 - `ANTHROPIC_API_KEY` — Claude API for orchestrator
 - `BROWSER_USE_API_KEY` — Browser Use Cloud
-- `FACECHECK_API_KEY` — FaceCheck.id
 - `BRAVE_API_KEY` — Brave Search API (fast web lookups)
 - `MAIGRET_SIDECAR_URL` — Maigret sidecar URL (optional, defaults to `http://localhost:8000`)
 

@@ -3,13 +3,12 @@ import { useQuery, useAction } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import { useEffect, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import BrowserView from "../components/BrowserView";
 import HudHeader from "../components/HudHeader";
 import CommandStrip from "../components/CommandStrip";
 import FindingToasts from "../components/FindingToasts";
 import CompletionFlash from "../components/CompletionFlash";
-import FaceScan from "../components/FaceScan";
 
 const STATUS_CONFIG: Record<
   string,
@@ -65,11 +64,6 @@ export default function Investigation() {
 
   const [started, setStarted] = useState(false);
   const [showCompletion, setShowCompletion] = useState(false);
-  const [activeFaceScan, setActiveFaceScan] = useState<{
-    imageUrl: string;
-    results?: { score: number; url: string; platform: string }[];
-  } | null>(null);
-  const [shownFaceSteps, setShownFaceSteps] = useState<Set<string>>(new Set());
 
   // Auto-start investigation
   useEffect(() => {
@@ -78,45 +72,6 @@ export default function Investigation() {
       startInvestigation({ investigationId });
     }
   }, [investigation, started, startInvestigation, investigationId]);
-
-  // Detect face_check steps to trigger FaceScan animation (only once per step)
-  useEffect(() => {
-    if (!steps) return;
-    const faceCheckStep = steps.find(
-      (s) =>
-        s.tool === "face_check" &&
-        s.result &&
-        !s.result.includes("error") &&
-        !shownFaceSteps.has(s._id)
-    );
-    if (faceCheckStep?.result) {
-      try {
-        const parsed = JSON.parse(faceCheckStep.result);
-        if (parsed.faces?.length > 0) {
-          setShownFaceSteps((prev) => new Set(prev).add(faceCheckStep._id));
-          setActiveFaceScan({
-            imageUrl: "",
-            results: parsed.faces.map(
-              (f: { score: number; url: string; platform: string }) => ({
-                score: f.score,
-                url: f.url,
-                platform: f.platform,
-              })
-            ),
-          });
-        }
-      } catch {
-        // ignore parse errors
-      }
-    }
-  }, [steps, shownFaceSteps]);
-
-  // Auto-dismiss FaceScan overlay after 8 seconds
-  useEffect(() => {
-    if (!activeFaceScan) return;
-    const timer = setTimeout(() => setActiveFaceScan(null), 8000);
-    return () => clearTimeout(timer);
-  }, [activeFaceScan]);
 
   // Trigger cinematic completion flash, then redirect to report
   useEffect(() => {
@@ -192,7 +147,6 @@ export default function Investigation() {
             backgroundSize: "40px 40px",
           }}
         />
-        {/* Radial glow */}
         <div
           className="absolute inset-0 pointer-events-none"
           style={{
@@ -243,18 +197,7 @@ export default function Investigation() {
         progress={progress}
       />
 
-      {/* Layer 5: FaceScan overlay */}
-      <AnimatePresence>
-        {activeFaceScan && (
-          <FaceScan
-            imageUrl={activeFaceScan.imageUrl}
-            results={activeFaceScan.results}
-            onDismiss={() => setActiveFaceScan(null)}
-          />
-        )}
-      </AnimatePresence>
-
-      {/* Layer 6: Completion cinematic flash */}
+      {/* Layer 5: Completion cinematic flash */}
       <AnimatePresence>
         {showCompletion && (
           <CompletionFlash

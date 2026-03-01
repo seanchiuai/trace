@@ -42,20 +42,15 @@ AI-powered missing persons investigation tool. User provides name, description, 
 **Acceptance Criteria:**
 - [x] System prompt defines investigator persona and available tools
 - [x] Orchestrator calls Opus with conversation history
-- [x] Opus selects tools: maigret_search, browser_action, face_check, save_finding, done
 - [x] Tool results fed back to Opus for next decision
 - [x] Steps logged to Convex for real-time frontend updates
 - [x] Max 20 steps enforced
 - [x] Report generation triggered on "done" or step limit
 - [ ] End-to-end loop tested with real API keys
 
-### US-005: FaceCheck Facial Recognition
-**As a** system, **I want to** run facial recognition on images **so that** we can identify people in photos and find matching profiles.
 
 **Acceptance Criteria:**
-- [x] Convex action calls FaceCheck API (upload + poll for results)
 - [x] Returns matching URLs with confidence scores and platform detection
-- [ ] FaceScan overlay triggers when face_check step completes
 - [ ] Scan animation → face brackets → match cards with confidence ticker
 
 ### US-006: Live Investigation Dashboard
@@ -82,17 +77,14 @@ AI-powered missing persons investigation tool. User provides name, description, 
 - [ ] Report renders formatted markdown (not raw pre block)
 - [ ] Export as PDF
 
-### US-009: FaceScan Wow Moment
 **As a** demo viewer, **I want to** see a dramatic face scanning animation **so that** the demo is memorable.
 
 **Acceptance Criteria:**
-- [x] FaceScan overlay component with scanning → matching → results phases
 - [x] Green scan line animation sweeps across image area
 - [x] Face bounding boxes with corner brackets snap in
 - [x] Match cards slide in with platform icon + confidence counter
 - [x] High-confidence matches (>90%) pulse with green glow
 - [x] Progress bar shows scan progress
-- [ ] Automatically triggered when face_check step returns results
 - [ ] Confidence counter animates from 0 to final value (verified)
 
 ### US-010: Dark Detective Theme

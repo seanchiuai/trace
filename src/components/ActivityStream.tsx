@@ -32,12 +32,6 @@ export const TOOL_CONFIG: Record<
     bg: "bg-cyan-400/10",
     border: "border-cyan-400/20",
   },
-  face_check: {
-    letter: "F",
-    color: "text-green-400",
-    bg: "bg-green-400/10",
-    border: "border-green-400/20",
-  },
   save_finding: {
     letter: "S",
     color: "text-yellow-400",

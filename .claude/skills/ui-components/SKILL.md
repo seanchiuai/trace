@@ -72,7 +72,6 @@ Use `.font-display` for Outfit, `font-mono` (default body) for JetBrains Mono. L
 | `BrowserView` | `src/components/BrowserView.tsx` | Live browser iframe with URL bar |
 | `ActivityStream` | `src/components/ActivityStream.tsx` | Real-time step timeline |
 | `FindingsGrid` | `src/components/FindingsGrid.tsx` | Evidence cards with confidence |
-| `FaceScan` | `src/components/FaceScan.tsx` | Face recognition animation overlay |
 | `DetectiveReport` | `src/components/DetectiveReport.tsx` | Final report with stats + evidence |
 | `LeadTree` | `src/components/LeadTree.tsx` | Connection network visualization |
 | `ImageGallery` | `src/components/ImageGallery.tsx` | Found images grid |
@@ -162,7 +161,6 @@ Single-letter abbreviations with tool-specific colors:
 | reasoning | R | `text-purple-400` |
 | maigret | M | `text-blue-400` |
 | browser_action | B | `text-cyan-400` |
-| face_check | F | `text-green-400` |
 | web_search | W | `text-orange-400` |
 | save_finding | S | `text-yellow-400` |
 
@@ -176,7 +174,6 @@ Single-letter abbreviations with tool-specific colors:
 
 ## CSS Animations
 
-Defined in `src/index.css`, used primarily by FaceScan:
 
 | Name | Effect | Duration |
 |------|--------|----------|
