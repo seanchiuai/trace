@@ -86,12 +86,8 @@ export const runTask = internalAction({
     const body: Record<string, unknown> = {
       task: args.task,
       keepAlive: true,
+      model: "bu-max",
     };
-
-    // Use premium model in extreme mode for +12% accuracy
-    if (args.extremeMode) {
-      body.model = "bu-2-0";
-    }
 
     // --- Session reuse: wait for idle or drop ---
     if (args.sessionId) {
