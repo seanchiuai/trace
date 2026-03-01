@@ -12,9 +12,10 @@ export const search = internalAction({
     const apiKey = process.env.BRAVE_API_KEY;
     if (!apiKey) throw new Error("BRAVE_API_KEY not set");
 
+    const count = Math.min(Math.max(1, args.count ?? 10), 20);
     const params = new URLSearchParams({
       q: args.query,
-      count: String(args.count ?? 10),
+      count: String(count),
     });
 
     const res = await fetch(`${BRAVE_SEARCH_API}?${params}`, {

@@ -2,7 +2,6 @@ import { motion, AnimatePresence } from "framer-motion";
 
 interface HudHeaderProps {
   targetName: string;
-  status: string;
   statusLabel: string;
   statusColor: string;
   dotColor: string;

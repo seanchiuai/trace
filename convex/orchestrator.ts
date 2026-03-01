@@ -300,14 +300,19 @@ export const step = internalAction({
 
     const toolResults: { id: string; tool: string; result: string }[] = [];
     let hasNonSaveFinding = false;
+    let currentStepNumber = stepNumber;
 
     for (const tc of toolCalls) {
-      if (tc.tool !== "save_finding") hasNonSaveFinding = true;
+      if (tc.tool !== "save_finding") {
+        hasNonSaveFinding = true;
+        currentStepNumber = (await ctx.runQuery(api.investigations.get, { id: args.investigationId }))?.stepCount ?? currentStepNumber;
+        currentStepNumber += 1;
+      }
       const result = await executeToolCall(ctx, {
         investigationId: args.investigationId,
         investigation,
         toolCall: tc,
-        stepNumber,
+        stepNumber: currentStepNumber,
       });
       toolResults.push({ id: tc.id, tool: tc.tool, result });
     }
@@ -318,7 +323,6 @@ export const step = internalAction({
       consecutiveSaveOnly = 0;
     } else {
       consecutiveSaveOnly++;
-      // After N consecutive save-only steps, force an increment to prevent runaway loops
       if (consecutiveSaveOnly >= MAX_CONSECUTIVE_SAVE_ONLY) {
         await ctx.runMutation(api.investigations.incrementStep, { id: args.investigationId });
         consecutiveSaveOnly = 0;
@@ -354,6 +358,7 @@ export const step = internalAction({
         id: args.investigationId,
         inputTokens: compressionTokens.input,
         outputTokens: compressionTokens.output,
+        model: "claude-sonnet-4-20250514",
       });
     }
 
@@ -651,8 +656,33 @@ ${summaryInput}`,
       return { history: conversationHistory };
     }
 
-    // Merge original brief + summary into one user message.
-    // recentMessages[0] is always an assistant message, so alternation is valid.
+    // Ensure recentMessages starts with an assistant message for valid alternation
+    // (compressed user summary + assistant response + user tool_result + ...)
+    if (recentMessages.length > 0 && recentMessages[0].role !== "assistant") {
+      // Shift cutoff back by one to capture the preceding assistant message
+      const adjustedCutoff = cutoffIndex - 1;
+      if (adjustedCutoff <= 1) return { history: conversationHistory };
+      const adjustedRecent = conversationHistory.slice(adjustedCutoff);
+      const adjustedSummarize = conversationHistory.slice(1, adjustedCutoff);
+      if (adjustedRecent[0]?.role !== "assistant") {
+        console.warn("Cannot ensure assistant-first alternation after compression, skipping");
+        return { history: conversationHistory };
+      }
+      // Use adjusted slices
+      return {
+        history: [
+          {
+            role: "user",
+            content: `${originalMessage.content as string}\n\n---\n\n[INVESTIGATION PROGRESS — Steps 1-${Math.floor(adjustedCutoff / 2)} compressed]\n\n${summary}\n\n[End of progress summary. Recent steps follow.]`,
+          },
+          ...adjustedRecent,
+        ],
+        compressionTokens: data.usage
+          ? { input: data.usage.input_tokens ?? 0, output: data.usage.output_tokens ?? 0 }
+          : undefined,
+      };
+    }
+
     const compressedHistory: Array<Record<string, unknown>> = [
       {
         role: "user",

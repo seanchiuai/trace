@@ -12,6 +12,7 @@ interface Finding {
 }
 
 interface Step {
+  _id: string;
   stepNumber: number;
   action: string;
   tool: string;
@@ -48,9 +49,10 @@ const TOOL_LABELS: Record<string, string> = {
   web_search: "Web Search",
 };
 
-function formatCaseNumber(id: string): string {
+function formatCaseNumber(id: string, completedAt?: number): string {
   const hash = id.slice(-6).toUpperCase();
-  return `TRC-${new Date().getFullYear()}-${hash}`;
+  const year = completedAt ? new Date(completedAt).getFullYear() : new Date().getFullYear();
+  return `TRC-${year}-${hash}`;
 }
 
 function formatDate(ts?: number): string {
@@ -120,7 +122,7 @@ function TypewriterText({ text, speed = 8 }: { text: string; speed?: number }) {
     if (!text) return;
     let i = 0;
     // Reveal in chunks for performance
-    const chunkSize = 3;
+    const chunkSize = 15;
     const interval = setInterval(() => {
       i += chunkSize;
       if (i >= text.length) {
@@ -316,12 +318,12 @@ export default function DetectiveReport({
     return acc;
   }, {});
 
-  const socialCount = findings.filter((f) => f.category === "social").length;
-  const connectionCount = findings.filter((f) => f.category === "connection").length;
-  const locationCount = findings.filter((f) => f.category === "location").length;
-  const activityCount = findings.filter((f) => f.category === "activity").length;
+  const socialCount = categoryCounts["social"] ?? 0;
+  const connectionCount = categoryCounts["connection"] ?? 0;
+  const locationCount = categoryCounts["location"] ?? 0;
+  const activityCount = categoryCounts["activity"] ?? 0;
 
-  const caseNumber = formatCaseNumber(caseId);
+  const caseNumber = formatCaseNumber(caseId, completedAt);
 
   return (
     <div className="min-h-screen bg-bg-primary relative">
@@ -633,7 +635,7 @@ export default function DetectiveReport({
             <div className="max-h-80 overflow-y-auto pr-2">
               {steps.map((step, i) => (
                 <TimelineStep
-                  key={step.stepNumber}
+                  key={step._id}
                   step={step}
                   index={i}
                   isLast={i === steps.length - 1}

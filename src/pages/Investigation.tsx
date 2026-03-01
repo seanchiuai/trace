@@ -218,7 +218,6 @@ export default function Investigation() {
       {/* Layer 2: HUD Header */}
       <HudHeader
         targetName={investigation.targetName}
-        status={investigation.status}
         statusLabel={status.label}
         statusColor={status.color}
         dotColor={status.dotColor}
