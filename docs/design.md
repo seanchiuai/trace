@@ -169,7 +169,7 @@ Consistent pattern across all components:
 ### ActivityStream (sub-components used by CommandStrip)
 - Exports `CollapsedStep`, `ExpandedStep`, `ToolBadge` sub-components
 - ToolBadge: w-8 h-8 (md) or w-6 h-6 (sm) rounded-lg with tool-specific bg/border/text/letter
-- 8 tools configured: reasoning(R), maigret(M), browser_action(B), web_search(W), save_finding(S), whitepages(P), reverse_image(I), darkweb(D)
+- 9 tools configured: reasoning(R), maigret(M), browser_action(B), web_search(W), save_finding(S), geo_locate(G), whitepages(P), reverse_image(I), darkweb(D)
 - CollapsedStep: `initial={{ opacity: 0, x: -12 }}`, single-line with tool badge
 - ExpandedStep: `initial={{ opacity: 0, x: -16 }}`, full content with `<details>` result block
 - Step content: 10px tool label + step number + timestamp, 13px action text

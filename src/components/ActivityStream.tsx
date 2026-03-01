@@ -44,6 +44,12 @@ export const TOOL_CONFIG: Record<
     bg: "bg-orange-400/10",
     border: "border-orange-400/20",
   },
+  geo_locate: {
+    letter: "G",
+    color: "text-green-400",
+    bg: "bg-green-400/10",
+    border: "border-green-400/20",
+  },
   whitepages: {
     letter: "P",
     color: "text-red-400",
