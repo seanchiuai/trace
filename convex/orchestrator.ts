@@ -9,7 +9,7 @@ const MAX_STEPS = 20;
 const MAX_CONSECUTIVE_SAVE_ONLY = 3;
 const COMPRESSION_TOKEN_THRESHOLD = 20_000;
 const KEEP_RECENT_EXCHANGES = 3;
-const MAX_CONSECUTIVE_ERRORS = 6;
+const MAX_CONSECUTIVE_ERRORS = 30;
 const MAX_BROWSER_ACTIONS = Infinity;
 
 function estimateTokens(text: string): number {

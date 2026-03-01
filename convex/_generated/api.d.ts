@@ -17,6 +17,7 @@ import type * as reports from "../reports.js";
 import type * as toolNames from "../toolNames.js";
 import type * as tools_braveSearch from "../tools/braveSearch.js";
 import type * as tools_browserUse from "../tools/browserUse.js";
+import type * as tools_dehashed from "../tools/dehashed.js";
 import type * as tools_intelx from "../tools/intelx.js";
 import type * as tools_maigret from "../tools/maigret.js";
 import type * as tools_picarta from "../tools/picarta.js";
@@ -39,6 +40,7 @@ declare const fullApi: ApiFromModules<{
   toolNames: typeof toolNames;
   "tools/braveSearch": typeof tools_braveSearch;
   "tools/browserUse": typeof tools_browserUse;
+  "tools/dehashed": typeof tools_dehashed;
   "tools/intelx": typeof tools_intelx;
   "tools/maigret": typeof tools_maigret;
   "tools/picarta": typeof tools_picarta;
