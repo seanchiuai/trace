@@ -22,7 +22,7 @@ function buildSystemPrompt(maigretAvailable: boolean, extremeMode: boolean = fal
     );
   }
   toolLines.push(
-    `${n++}. browser_action(instruction) — Control a web browser. Give clear instructions like "Go to imginn.com/username and report what you see." IMPORTANT: For Instagram profiles, ALWAYS use imginn.com (e.g. imginn.com/username) instead of instagram.com — it shows public profiles without login walls. Returns screenshots and page text. Use for interactive pages that require scrolling or JS rendering. EXPENSIVE — prefer web_search for simple lookups.`,
+    `${n++}. browser_action(instruction) — Control a web browser. Give clear instructions like "Go to imginn.com/username and report what you see." IMPORTANT: Most social media sites (Instagram, LinkedIn, Facebook, Twitter) have login walls — NEVER browse them directly. Use proxy viewer sites instead (see Login Wall Avoidance in strategy). Returns screenshots and page text. Use for interactive pages that require scrolling or JS rendering. EXPENSIVE — prefer web_search for simple lookups.`,
     `${n++}. web_search(query, count?) — Fast web search. Returns titles, URLs, and snippets. Use this FIRST for simple lookups like "John Smith LinkedIn", "username site:twitter.com", company info, news articles, etc. Much faster and cheaper than browser_action.`,
     `${n++}. geospy_predict(imageUrl) — AI photo geolocation. Upload a photo URL and get predicted GPS coordinates, city, country, and an explanation of the visual clues used. Use on any image that might reveal a location (street views, landmarks, scenery).`,
     `${n++}. geo_locate(imageUrl) — AI geolocation via Picarta: analyzes an image and predicts WHERE it was taken (city, state, country, GPS coordinates) based on visual clues. Returns coordinates, confidence score, EXIF metadata, and top-3 predictions. Use on any photo with visible backgrounds, landmarks, or architecture.`,
@@ -61,6 +61,14 @@ function buildSystemPrompt(maigretAvailable: boolean, extremeMode: boolean = fal
     `  - General → cast a wide net across major platforms`,
     `- When you find photos with visible backgrounds (buildings, streets, landscapes), run geo_locate to predict GPS location`,
     `- Use web_search for simple lookups; reserve browser_action for pages that need interaction`,
+    `- Login wall avoidance — NEVER visit these sites directly in browser_action, use alternatives:`,
+    `  - Instagram → use imginn.com/username or picuki.com/profile/username (public viewer, no login)`,
+    `  - TikTok → use urlebird.com/user/username (public viewer, no login)`,
+    `  - Facebook → use web_search "site:facebook.com name" for cached data; or try mbasic.facebook.com/username for minimal public view`,
+    `  - LinkedIn → use web_search "site:linkedin.com/in/ name title" — Google caches public profiles; NEVER browse linkedin.com directly (login wall)`,
+    `  - Twitter/X → try nitter.net/username or xcancel.com/username as public viewers; fall back to web_search "site:x.com username"`,
+    `  - Pinterest → use web_search "site:pinterest.com username"; or browse pinterest.com/username/ (usually public without login)`,
+    `  - Reddit → use old.reddit.com/user/username (no login needed for public profiles)`,
     `- Save findings as you go (it's free — doesn't burn steps)`,
     `- You can call multiple tools at once — do so when actions are independent`,
     `- After gathering enough evidence (or nearing 20 steps), call done()`,
