@@ -118,7 +118,7 @@ ${maigretAvailable && isEnabled(TOOL_NAMES.MAIGRET_SEARCH) ? "- Username known -
 - ALWAYS search: "Name + Description + Instagram" (e.g. "John Doe San Francisco tech Instagram") — this often finds the exact Instagram profile when a generic name search fails
 - When you find an Instagram username from ANY source -> STOP and browse imginn.com/username before continuing
 - Common name -> add description details (city, job, age) to searches; use ask_user if results are ambiguous
-- Photo available -> parallel: geo_locate + reverse_image_search (geo_locate is approximate — corroborate with other evidence before reporting as fact)
+- Photo available -> parallel: geo_locate + reverse_image_search (geo_locate is approximate — corroborate with other evidence before reporting as fact). IMPORTANT: geo_locate and reverse_image_search need a DIRECT image URL (the img src, not the page URL). If you have a page URL, use browser_action to find the actual image src first.
 - Links provided -> web_search each link for context
 ${extremeMode && isEnabled(TOOL_NAMES.DARKWEB_SEARCH) ? "- Email/username -> darkweb_search for breach records" : ""}
 
