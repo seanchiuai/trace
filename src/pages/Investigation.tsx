@@ -1,4 +1,4 @@
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useAction } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
@@ -8,7 +8,6 @@ import BrowserView from "../components/BrowserView";
 import ActivityStream from "../components/ActivityStream";
 import FindingsGrid from "../components/FindingsGrid";
 import FaceScan from "../components/FaceScan";
-import DetectiveReport from "../components/DetectiveReport";
 
 const STATUS_CONFIG: Record<
   string,
@@ -48,6 +47,7 @@ const STATUS_CONFIG: Record<
 
 export default function Investigation() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const investigationId = id as Id<"investigations">;
 
   const investigation = useQuery(api.investigations.get, {
@@ -114,6 +114,13 @@ export default function Investigation() {
     const timer = setTimeout(() => setActiveFaceScan(null), 8000);
     return () => clearTimeout(timer);
   }, [activeFaceScan]);
+
+  // Redirect to report page when investigation completes
+  useEffect(() => {
+    if (investigation?.status === "complete" && investigation.report) {
+      navigate(`/report/${id}`, { replace: true });
+    }
+  }, [investigation?.status, investigation?.report, id, navigate]);
 
   if (!investigation) {
     return (
@@ -305,39 +312,10 @@ export default function Investigation() {
           transition={{ duration: 0.5, delay: 0.1 }}
           className="border-r border-border min-h-0 relative overflow-hidden"
         >
-          <AnimatePresence mode="wait">
-            {investigation.status === "complete" && investigation.report ? (
-              <motion.div
-                key="report"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.5, ease: "easeOut" }}
-                className="h-full overflow-y-auto"
-              >
-                <DetectiveReport
-                  report={investigation.report}
-                  targetName={investigation.targetName}
-                  confidence={investigation.confidence}
-                  findings={findings || []}
-                />
-              </motion.div>
-            ) : (
-              <motion.div
-                key="browser"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.3 }}
-                className="h-full"
-              >
-                <BrowserView
-                  liveUrl={investigation.browserLiveUrl}
-                  status={investigation.status}
-                />
-              </motion.div>
-            )}
-          </AnimatePresence>
+          <BrowserView
+            liveUrl={investigation.browserLiveUrl}
+            status={investigation.status}
+          />
         </motion.div>
 
         {/* Right: Activity + Findings */}
