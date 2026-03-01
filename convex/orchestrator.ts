@@ -27,7 +27,7 @@ function buildSystemPrompt(maigretAvailable: boolean, extremeMode: boolean = fal
   }
   if (isEnabled(TOOL_NAMES.BROWSER_ACTION)) {
     toolLines.push(
-      `${n++}. browser_action(instruction) - Control a real browser. Returns page text + visual content descriptions. SLOW (~60-180s) and LIMITED to ${MAX_BROWSER_ACTIONS} uses per investigation. HIGH VALUE for Instagram, TikTok, and visual platforms — use it to browse profiles, photos, location tags, and connections. See BROWSER RULES below.`
+      `${n++}. browser_action(instruction) - Control a real browser. Returns page text + visual content descriptions. SLOW (~60-180s) and LIMITED to ${MAX_BROWSER_ACTIONS} uses per investigation. HIGH VALUE for imginn.com (Instagram OSINT), TikTok, and visual platforms — use it to browse profiles, photos, location tags, and connections. See BROWSER RULES below.`
     );
   }
   if (isEnabled(TOOL_NAMES.WEB_SEARCH)) {
@@ -74,13 +74,15 @@ Decision tree:
 2. Need to see photos, posts, stories, location tags, or visual content? -> Use browser_action (this is its strength)
 3. Did browser_action just fail/timeout? -> NEVER retry the same page. Try an alternative URL or switch to web_search.
 
-BEST uses of browser_action: Instagram profiles (photos, location tags, tagged people, stories), TikTok profiles, any page with visual/interactive content.
+BEST uses of browser_action: imginn.com (Instagram OSINT — photos, location tags, tagged people, stories), TikTok profiles, any page with visual/interactive content.
 AVOID browser_action for: LinkedIn, GitHub, Wikipedia, news articles - web_search gets the same text data faster.
 
 ## SOCIAL MEDIA BROWSING
-Instagram is HIGH VALUE for investigations — browse it directly:
-- instagram.com/username — public profiles show photos, location tags, tagged people, bio links, stories highlights. Scroll through posts looking for locations, faces, connections.
-- If instagram.com shows a login wall, fall back to: imginn.com/username or picuki.com/profile/username
+Instagram is the #1 HIGHEST VALUE platform for OSINT investigations. USE IMGINN AS YOUR PRIMARY TOOL for Instagram:
+- imginn.com/username — NO LOGIN REQUIRED. Shows full public profile: photos, reels, stories, tagged posts, location tags, bio, connections. This is your go-to for Instagram OSINT.
+- Always browse imginn.com EARLY in the investigation when you have a username — don't save it for later.
+- Look carefully at every photo: location tags, landmarks, building names, people tagged, captions mentioning places/events/people.
+- If imginn.com is down, fall back to: picuki.com/profile/username or instagram.com/username directly
 - TikTok -> urlebird.com/user/username (public viewer) or browse tiktok.com/@username directly
 - Facebook -> mbasic.facebook.com/username or web_search "site:facebook.com name"
 - LinkedIn -> web_search "site:linkedin.com/in/ name title" (NEVER browse directly, login wall is strict)
@@ -107,7 +109,7 @@ ${extremeMode && isEnabled(TOOL_NAMES.DARKWEB_SEARCH) ? "- Email/username -> dar
 
 **Phase 2 - Follow Leads (Steps 6-14):**
 - Cross-reference findings: verify identities across platforms
-- Browse confirmed Instagram/TikTok profiles with browser_action — look at photos for locations, faces, tagged people, bio links
+- Browse confirmed Instagram profiles via imginn.com/username with browser_action — look at photos for locations, landmarks, faces, tagged people, bio links, captions
 - Explore confirmed profiles deeper (web_search for text-heavy sites, browser_action for visual platforms like Instagram)
 - Search for connections between discovered accounts
 - Target demographics: younger -> TikTok/Instagram/Discord; professional -> LinkedIn/GitHub
@@ -251,7 +253,7 @@ const TOOL_DEFINITIONS = [
       properties: {
         instruction: {
           type: "string",
-          description: 'What to do in the browser, e.g. "Go to instagram.com/johndoe and describe their photos, location tags, bio, and tagged people"',
+          description: 'What to do in the browser, e.g. "Go to imginn.com/johndoe and describe their photos, location tags, bio, and tagged people"',
         },
       },
       required: ["instruction"],
