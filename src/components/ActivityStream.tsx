@@ -1,7 +1,7 @@
 import { useRef, useEffect, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
-interface Step {
+export interface Step {
   _id: string;
   stepNumber: number;
   action: string;
@@ -10,7 +10,7 @@ interface Step {
   createdAt: number;
 }
 
-const TOOL_CONFIG: Record<
+export const TOOL_CONFIG: Record<
   string,
   { letter: string; color: string; bg: string; border: string }
 > = {
@@ -46,7 +46,7 @@ const TOOL_CONFIG: Record<
   },
 };
 
-function ToolBadge({ tool, size = "md" }: { tool: string; size?: "sm" | "md" }) {
+export function ToolBadge({ tool, size = "md" }: { tool: string; size?: "sm" | "md" }) {
   const config = TOOL_CONFIG[tool] || {
     letter: "?",
     color: "text-text-muted",
@@ -65,7 +65,7 @@ function ToolBadge({ tool, size = "md" }: { tool: string; size?: "sm" | "md" }) 
   );
 }
 
-function formatTime(timestamp: number): string {
+export function formatTime(timestamp: number): string {
   return new Date(timestamp).toLocaleTimeString([], {
     hour: "2-digit",
     minute: "2-digit",
@@ -74,7 +74,7 @@ function formatTime(timestamp: number): string {
 }
 
 /** Collapsed single-line row for completed steps */
-function CollapsedStep({
+export function CollapsedStep({
   step,
   onExpand,
 }: {
@@ -118,7 +118,7 @@ function CollapsedStep({
 }
 
 /** Expanded detail card for active / manually-expanded steps */
-function ExpandedStep({
+export function ExpandedStep({
   step,
   isActive,
   onCollapse,
