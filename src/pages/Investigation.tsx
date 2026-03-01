@@ -319,8 +319,11 @@ export default function Investigation() {
           className="flex flex-col min-h-0 overflow-hidden"
         >
           {/* Activity Stream */}
-          <div className="flex-1 overflow-y-auto border-b border-border">
-            <ActivityStream steps={steps || []} />
+          <div className="flex-1 min-h-0 border-b border-border">
+            <ActivityStream
+              steps={steps || []}
+              isLive={investigation.status === "investigating" || investigation.status === "planning" || investigation.status === "analyzing"}
+            />
           </div>
 
           {/* Findings */}
