@@ -183,9 +183,13 @@ export default function CommandStrip({ steps, isLive, progress, onStop }: Comman
               animate={{ opacity: 1, scale: 1, width: "auto" }}
               exit={{ opacity: 0, scale: 0.8, width: 0 }}
               transition={{ duration: 0.2 }}
-              onClick={() => {
+              onClick={async () => {
                 setStopping(true);
-                onStop();
+                try {
+                  await onStop();
+                } catch {
+                  setStopping(false);
+                }
               }}
               disabled={stopping}
               className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-danger/10 hover:bg-danger/20 transition-colors text-danger cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed overflow-hidden"
