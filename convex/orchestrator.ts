@@ -2,10 +2,10 @@ import { v } from "convex/values";
 import { action, internalAction } from "./_generated/server";
 import { internal, api } from "./_generated/api";
 import type { ActionCtx } from "./_generated/server";
+import type { Id } from "./_generated/dataModel";
 
 const MAX_STEPS = 20;
 const MAX_CONSECUTIVE_SAVE_ONLY = 3;
-
 const COMPRESSION_TOKEN_THRESHOLD = 20_000;
 const KEEP_RECENT_EXCHANGES = 3;
 
@@ -74,10 +74,7 @@ const TOOL_DEFINITIONS = [
     input_schema: {
       type: "object",
       properties: {
-        username: {
-          type: "string",
-          description: "The username to search for",
-        },
+        username: { type: "string", description: "The username to search for" },
       },
       required: ["username"],
     },
@@ -91,8 +88,7 @@ const TOOL_DEFINITIONS = [
       properties: {
         instruction: {
           type: "string",
-          description:
-            'What to do in the browser, e.g. "Go to instagram.com/johndoe and describe what you see"',
+          description: 'What to do in the browser, e.g. "Go to instagram.com/johndoe and describe what you see"',
         },
       },
       required: ["instruction"],
@@ -100,79 +96,50 @@ const TOOL_DEFINITIONS = [
   },
   {
     name: "face_check",
-    description:
-      "Run facial recognition on an image URL. Returns matching profiles with confidence scores.",
+    description: "Run facial recognition on an image URL. Returns matching profiles with confidence scores.",
     input_schema: {
       type: "object",
       properties: {
-        imageUrl: {
-          type: "string",
-          description: "URL of the image to search faces in",
-        },
+        imageUrl: { type: "string", description: "URL of the image to search faces in" },
       },
       required: ["imageUrl"],
     },
   },
   {
     name: "web_search",
-    description:
-      "Fast web search via Brave Search API. Returns titles, URLs, and snippets. Use for quick lookups instead of browser_action.",
+    description: "Fast web search via Brave Search API. Returns titles, URLs, and snippets. Use for quick lookups instead of browser_action.",
     input_schema: {
       type: "object",
       properties: {
-        query: {
-          type: "string",
-          description: "The search query",
-        },
-        count: {
-          type: "number",
-          description: "Number of results (default 10, max 20)",
-        },
+        query: { type: "string", description: "The search query" },
+        count: { type: "number", description: "Number of results (default 10, max 20)" },
       },
       required: ["query"],
     },
   },
   {
     name: "save_finding",
-    description:
-      "Save a confirmed finding from the investigation. FREE — does not count toward your step budget.",
+    description: "Save a confirmed finding from the investigation. FREE — does not count toward your step budget.",
     input_schema: {
       type: "object",
       properties: {
-        source: {
-          type: "string",
-          description:
-            'Where this finding came from: "instagram", "facecheck", "maigret", "browser", "web_search", etc.',
-        },
-        category: {
-          type: "string",
-          enum: ["social", "connection", "location", "activity", "identity"],
-        },
+        source: { type: "string", description: 'Where this finding came from: "instagram", "facecheck", "maigret", "browser", "web_search", etc.' },
+        category: { type: "string", enum: ["social", "connection", "location", "activity", "identity"] },
         platform: { type: "string", description: "Platform name" },
         profileUrl: { type: "string", description: "URL if applicable" },
-        data: {
-          type: "string",
-          description: "Description of the finding",
-        },
-        confidence: {
-          type: "number",
-          description: "Confidence 0-100",
-        },
+        data: { type: "string", description: "Description of the finding" },
+        confidence: { type: "number", description: "Confidence 0-100" },
       },
       required: ["source", "category", "data", "confidence"],
     },
   },
   {
     name: "done",
-    description:
-      "End the investigation and generate the final detective report.",
+    description: "End the investigation and generate the final detective report.",
     input_schema: {
       type: "object",
       properties: {
-        summary: {
-          type: "string",
-          description: "Brief summary of all findings",
-        },
+        summary: { type: "string", description: "Brief summary of all findings" },
       },
       required: ["summary"],
     },
@@ -182,23 +149,15 @@ const TOOL_DEFINITIONS = [
 export const startInvestigation = action({
   args: { investigationId: v.id("investigations") },
   handler: async (ctx, args) => {
-    const investigation = await ctx.runQuery(api.investigations.get, {
-      id: args.investigationId,
-    });
+    const investigation = await ctx.runQuery(api.investigations.get, { id: args.investigationId });
     if (!investigation) throw new Error("Investigation not found");
 
-    await ctx.runMutation(api.investigations.updateStatus, {
-      id: args.investigationId,
-      status: "investigating",
-    });
+    await ctx.runMutation(api.investigations.updateStatus, { id: args.investigationId, status: "investigating" });
 
     // Eagerly create a browser session so the live URL appears in the UI immediately.
     // Non-blocking: if this fails, runTask will auto-create a session later.
     try {
-      const session = await ctx.runAction(
-        internal.tools.browserUse.createSession,
-        {}
-      );
+      const session = await ctx.runAction(internal.tools.browserUse.createSession, {});
       if (session?.id && session?.liveUrl) {
         await ctx.runMutation(api.investigations.updateBrowserSession, {
           id: args.investigationId,
@@ -210,13 +169,12 @@ export const startInvestigation = action({
       console.warn("Eager browser session creation failed (non-blocking):", e);
     }
 
-    // Health-check maigret sidecar
     let maigretAvailable = false;
     try {
       const health = await ctx.runAction(internal.tools.maigret.healthCheck, {});
       maigretAvailable = health.healthy === true;
     } catch {
-      // Sidecar unreachable
+      // Sidecar unreachable — will be excluded from tools
     }
     console.log(`Maigret sidecar health check: ${maigretAvailable ? "available" : "unavailable"}`);
 
@@ -233,24 +191,12 @@ export const startInvestigation = action({
     else
       infoLines.push(`No photo provided`);
 
-    const usernames = extractUsernamesFromLinks(investigation.knownLinks);
-    if (usernames.length > 0)
-      infoLines.push(`Extracted usernames from links: ${usernames.join(", ")}`);
-
-    // Start the orchestrator loop
     await ctx.scheduler.runAfter(0, internal.orchestrator.step, {
       investigationId: args.investigationId,
-      conversationHistory: JSON.stringify([
-        {
-          role: "user",
-          content: `Investigate this person.
-
-Available info summary:
-${infoLines.join("\n")}
-
-Begin your investigation. Adapt your strategy to the available information — what's your first move?`,
-        },
-      ]),
+      conversationHistory: JSON.stringify([{
+        role: "user",
+        content: `Investigate this person.\n\nAvailable info summary:\n${infoLines.join("\n")}\n\nBegin your investigation. Adapt your strategy to the available information — what's your first move?`,
+      }]),
       consecutiveSaveOnlySteps: 0,
       maigretAvailable,
     });
@@ -265,18 +211,15 @@ export const step = internalAction({
     maigretAvailable: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
-    const investigation = await ctx.runQuery(api.investigations.get, {
-      id: args.investigationId,
-    });
+    const investigation = await ctx.runQuery(api.investigations.get, { id: args.investigationId });
     if (!investigation) return;
     if (investigation.status === "complete" || investigation.status === "failed") return;
     if (investigation.stepCount >= MAX_STEPS) {
-      await generateReport(ctx, args.investigationId, args.conversationHistory);
+      await generateReport(ctx, args.investigationId);
       return;
     }
 
     const conversationHistory = JSON.parse(args.conversationHistory);
-
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) throw new Error("ANTHROPIC_API_KEY not set");
 
@@ -315,7 +258,6 @@ export const step = internalAction({
 
     const data = await response.json();
 
-    // Track token usage
     if (data.usage) {
       await ctx.runMutation(api.investigations.updateTokenUsage, {
         id: args.investigationId,
@@ -347,14 +289,12 @@ export const step = internalAction({
     }
 
     if (toolCalls.length === 0) {
-      // No tool call — might be done or confused
-      await generateReport(ctx, args.investigationId, args.conversationHistory);
+      await generateReport(ctx, args.investigationId);
       return;
     }
 
-    const doneCall = toolCalls.find((tc) => tc.tool === "done");
-    if (doneCall) {
-      await generateReport(ctx, args.investigationId, args.conversationHistory);
+    if (toolCalls.find((tc) => tc.tool === "done")) {
+      await generateReport(ctx, args.investigationId);
       return;
     }
 
@@ -374,17 +314,13 @@ export const step = internalAction({
 
     let consecutiveSaveOnly = args.consecutiveSaveOnlySteps ?? 0;
     if (hasNonSaveFinding) {
-      await ctx.runMutation(api.investigations.incrementStep, {
-        id: args.investigationId,
-      });
+      await ctx.runMutation(api.investigations.incrementStep, { id: args.investigationId });
       consecutiveSaveOnly = 0;
     } else {
       consecutiveSaveOnly++;
-      // Prevent infinite save_finding-only loops
+      // After N consecutive save-only steps, force an increment to prevent runaway loops
       if (consecutiveSaveOnly >= MAX_CONSECUTIVE_SAVE_ONLY) {
-        await ctx.runMutation(api.investigations.incrementStep, {
-          id: args.investigationId,
-        });
+        await ctx.runMutation(api.investigations.incrementStep, { id: args.investigationId });
         consecutiveSaveOnly = 0;
       }
     }
@@ -411,8 +347,7 @@ export const step = internalAction({
       { role: "user", content: toolResultBlocks },
     ];
 
-    const { history: finalHistory, compressionTokens } =
-      await compressHistory(updatedHistory);
+    const { history: finalHistory, compressionTokens } = await compressHistory(updatedHistory);
 
     if (compressionTokens) {
       await ctx.runMutation(api.investigations.updateTokenUsage, {
@@ -422,7 +357,6 @@ export const step = internalAction({
       });
     }
 
-    // Schedule the next step
     await ctx.scheduler.runAfter(0, internal.orchestrator.step, {
       investigationId: args.investigationId,
       conversationHistory: JSON.stringify(finalHistory),
@@ -435,44 +369,35 @@ export const step = internalAction({
 async function executeToolCall(
   ctx: Pick<ActionCtx, "runQuery" | "runMutation" | "runAction">,
   params: {
-    investigationId: string;
-    investigation: {
-      targetName: string;
-      targetDescription?: string;
-      browserSessionId?: string;
-    };
+    investigationId: Id<"investigations">;
+    investigation: { targetName: string; targetDescription?: string };
     toolCall: ToolCall;
     stepNumber: number;
   }
 ): Promise<string> {
   const { investigationId, investigation, toolCall, stepNumber } = params;
-  const idTyped = investigationId as any;
 
   try {
     switch (toolCall.tool) {
       case "maigret_search": {
         await ctx.runMutation(api.investigations.addStep, {
-          investigationId: idTyped,
+          investigationId,
           stepNumber,
           action: `Running intelligent OSINT search for "${toolCall.args.username}" — searching 3,000+ sites, extracting leads via AI, following connections`,
           tool: "maigret",
         });
-        const investigateResult = await ctx.runAction(
-          internal.tools.maigret.investigate,
-          {
-            username: toolCall.args.username as string,
-            targetName: investigation.targetName || undefined,
-            targetDescription: investigation.targetDescription || undefined,
-          }
-        );
+        const investigateResult = await ctx.runAction(internal.tools.maigret.investigate, {
+          username: toolCall.args.username as string,
+          targetName: investigation.targetName || undefined,
+          targetDescription: investigation.targetDescription || undefined,
+        });
 
         const formattedResult = formatInvestigationForOpus(investigateResult);
 
-        // Auto-save leads as findings
         if (investigateResult.leads_extracted?.length > 0) {
           for (const lead of investigateResult.leads_extracted.slice(0, 5)) {
             await ctx.runMutation(api.investigations.addFinding, {
-              investigationId: idTyped,
+              investigationId,
               source: "maigret",
               category: "connection",
               platform: lead.platform || undefined,
@@ -484,7 +409,7 @@ async function executeToolCall(
 
         if (investigateResult.llm_analysis) {
           await ctx.runMutation(api.investigations.addStep, {
-            investigationId: idTyped,
+            investigationId,
             stepNumber,
             action: `AI Lead Analysis: ${investigateResult.llm_analysis.slice(0, 500)}`,
             tool: "reasoning",
@@ -495,55 +420,38 @@ async function executeToolCall(
 
       case "browser_action": {
         await ctx.runMutation(api.investigations.addStep, {
-          investigationId: idTyped,
+          investigationId,
           stepNumber,
           action: `Browser: ${(toolCall.args.instruction as string).slice(0, 200)}`,
           tool: "browser_action",
         });
 
-        // Re-read investigation to get latest browserSessionId
-        const freshInvestigation = await ctx.runQuery(api.investigations.get, {
-          id: idTyped,
-        });
+        const freshInvestigation = await ctx.runQuery(api.investigations.get, { id: investigationId });
         const sessionId = freshInvestigation?.browserSessionId ?? undefined;
 
         let browserResult;
         try {
-          browserResult = await ctx.runAction(
-            internal.tools.browserUse.runTask,
-            {
-              task: toolCall.args.instruction as string,
-              sessionId,
-            }
-          );
+          browserResult = await ctx.runAction(internal.tools.browserUse.runTask, {
+            task: toolCall.args.instruction as string,
+            sessionId,
+          });
         } catch (error) {
-          // Session expired (400) — create a new one and retry
           const errMsg = error instanceof Error ? error.message : String(error);
-          if (
-            errMsg.includes("BROWSER_TASK_CREATION_FAILED:400") &&
-            sessionId
-          ) {
+          if (errMsg.includes("BROWSER_TASK_CREATION_FAILED:400") && sessionId) {
             console.warn("Browser session expired, creating fresh session...");
             try {
-              const newSession = await ctx.runAction(
-                internal.tools.browserUse.createSession,
-                {}
-              );
+              const newSession = await ctx.runAction(internal.tools.browserUse.createSession, {});
               if (newSession?.id) {
                 await ctx.runMutation(api.investigations.updateBrowserSession, {
-                  id: idTyped,
+                  id: investigationId,
                   browserSessionId: newSession.id,
                   browserLiveUrl: newSession.liveUrl,
                 });
               }
-              // Retry with the new session
-              browserResult = await ctx.runAction(
-                internal.tools.browserUse.runTask,
-                {
-                  task: toolCall.args.instruction as string,
-                  sessionId: newSession?.id,
-                }
-              );
+              browserResult = await ctx.runAction(internal.tools.browserUse.runTask, {
+                task: toolCall.args.instruction as string,
+                sessionId: newSession?.id,
+              });
             } catch (retryError) {
               return `Tool error (browser retry failed): ${retryError instanceof Error ? retryError.message : String(retryError)}`;
             }
@@ -554,21 +462,19 @@ async function executeToolCall(
 
         const toolResult = browserResult?.output ?? JSON.stringify(browserResult);
 
-        // If we didn't have a session before, store the new one
         if (!sessionId && browserResult?.sessionId) {
           try {
-            const session = await ctx.runAction(
-              internal.tools.browserUse.getSession,
-              { sessionId: browserResult.sessionId }
-            );
+            const session = await ctx.runAction(internal.tools.browserUse.getSession, {
+              sessionId: browserResult.sessionId,
+            });
             await ctx.runMutation(api.investigations.updateBrowserSession, {
-              id: idTyped,
+              id: investigationId,
               browserSessionId: browserResult.sessionId,
               browserLiveUrl: session?.liveUrl,
             });
           } catch {
             await ctx.runMutation(api.investigations.updateBrowserSession, {
-              id: idTyped,
+              id: investigationId,
               browserSessionId: browserResult.sessionId,
             });
           }
@@ -578,32 +484,28 @@ async function executeToolCall(
 
       case "face_check": {
         await ctx.runMutation(api.investigations.addStep, {
-          investigationId: idTyped,
+          investigationId,
           stepNumber,
           action: `Running face recognition on image`,
           tool: "face_check",
         });
-        const faceResult = await ctx.runAction(
-          internal.tools.faceCheck.searchByImage,
-          { imageUrl: toolCall.args.imageUrl as string }
-        );
+        const faceResult = await ctx.runAction(internal.tools.faceCheck.searchByImage, {
+          imageUrl: toolCall.args.imageUrl as string,
+        });
         return JSON.stringify(faceResult);
       }
 
       case "web_search": {
         await ctx.runMutation(api.investigations.addStep, {
-          investigationId: idTyped,
+          investigationId,
           stepNumber,
           action: `Web search: "${(toolCall.args.query as string).slice(0, 200)}"`,
           tool: "web_search",
         });
-        const searchResult = await ctx.runAction(
-          internal.tools.braveSearch.search,
-          {
-            query: toolCall.args.query as string,
-            count: (toolCall.args.count as number) ?? undefined,
-          }
-        );
+        const searchResult = await ctx.runAction(internal.tools.braveSearch.search, {
+          query: toolCall.args.query as string,
+          count: toolCall.args.count as number | undefined,
+        });
         return JSON.stringify(searchResult);
       }
 
@@ -617,7 +519,7 @@ async function executeToolCall(
           confidence: number;
         };
         await ctx.runMutation(api.investigations.addFinding, {
-          investigationId: idTyped,
+          investigationId,
           source: findingArgs.source,
           category: findingArgs.category,
           platform: findingArgs.platform,
@@ -626,7 +528,7 @@ async function executeToolCall(
           confidence: findingArgs.confidence,
         });
         await ctx.runMutation(api.investigations.addStep, {
-          investigationId: idTyped,
+          investigationId,
           stepNumber,
           action: `Saved finding: ${findingArgs.data.slice(0, 200)}`,
           tool: "save_finding",
@@ -651,19 +553,17 @@ async function compressHistory(
   conversationHistory: Array<Record<string, unknown>>
 ): Promise<CompressionResult> {
   const serialized = JSON.stringify(conversationHistory);
-  const estimatedTokens = estimateTokens(serialized);
+  const tokens = estimateTokens(serialized);
 
   // If already compressed, raise threshold to avoid thrashing
   const alreadyCompressed =
     typeof conversationHistory[0]?.content === "string" &&
-    (conversationHistory[0].content as string).includes(
-      "[INVESTIGATION PROGRESS"
-    );
+    (conversationHistory[0].content as string).includes("[INVESTIGATION PROGRESS");
   const effectiveThreshold = alreadyCompressed
     ? COMPRESSION_TOKEN_THRESHOLD * 1.3
     : COMPRESSION_TOKEN_THRESHOLD;
 
-  if (estimatedTokens <= effectiveThreshold || conversationHistory.length < 6) {
+  if (tokens <= effectiveThreshold || conversationHistory.length < 6) {
     return { history: conversationHistory };
   }
 
@@ -682,27 +582,17 @@ async function compressHistory(
     .map((msg) => {
       const role = msg.role as string;
       if (role === "assistant") {
-        const content = msg.content as Array<{
-          type: string;
-          text?: string;
-          name?: string;
-          input?: unknown;
-        }>;
+        const content = msg.content as Array<{ type: string; text?: string; name?: string; input?: unknown }>;
         const text = content?.find((b) => b.type === "text")?.text || "";
         const toolUses = content?.filter((b) => b.type === "tool_use") || [];
         const toolSummary = toolUses
-          .map(
-            (t) =>
-              `${t.name}(${JSON.stringify(t.input).slice(0, 200)})`
-          )
+          .map((t) => `${t.name}(${JSON.stringify(t.input).slice(0, 200)})`)
           .join(", ");
         return `[Assistant] ${text.slice(0, 500)}${toolSummary ? `\nTools called: ${toolSummary}` : ""}`;
       } else if (role === "user") {
         const content = msg.content;
         if (Array.isArray(content)) {
-          const results = (
-            content as Array<{ type: string; content?: string }>
-          )
+          const results = (content as Array<{ type: string; content?: string }>)
             .filter((b) => b.type === "tool_result")
             .map((b) => (b.content || "").slice(0, 1000))
             .join("\n");
@@ -729,10 +619,9 @@ async function compressHistory(
       body: JSON.stringify({
         model: "claude-sonnet-4-20250514",
         max_tokens: 1024,
-        messages: [
-          {
-            role: "user",
-            content: `You are summarizing the progress of an OSINT investigation. The investigator needs this summary to continue making good decisions.
+        messages: [{
+          role: "user",
+          content: `You are summarizing the progress of an OSINT investigation. The investigator needs this summary to continue making good decisions.
 
 Summarize the following investigation steps concisely. Include:
 1. **Tools used & results**: What was searched and key data points found
@@ -745,33 +634,25 @@ Be concise but preserve all actionable intelligence. No raw tool output — only
 
 Steps to summarize:
 ${summaryInput}`,
-          },
-        ],
+        }],
       }),
     });
 
     if (!response.ok) {
-      console.warn(
-        "History compression API call failed, using uncompressed history"
-      );
+      console.warn("History compression API call failed, using uncompressed history");
       return { history: conversationHistory };
     }
 
     const data = await response.json();
-    const summary =
-      data.content?.find((b: { type: string }) => b.type === "text")?.text ||
-      "";
+    const summary = data.content?.find((b: { type: string }) => b.type === "text")?.text || "";
 
     if (!summary) {
-      console.warn(
-        "History compression returned empty summary, using uncompressed history"
-      );
+      console.warn("History compression returned empty summary, using uncompressed history");
       return { history: conversationHistory };
     }
 
     // Merge original brief + summary into one user message.
-    // recentMessages[0] is always an assistant message, so alternation is valid:
-    // user (merged) → assistant → user → assistant → ...
+    // recentMessages[0] is always an assistant message, so alternation is valid.
     const compressedHistory: Array<Record<string, unknown>> = [
       {
         role: "user",
@@ -782,16 +663,13 @@ ${summaryInput}`,
 
     const compressedSize = estimateTokens(JSON.stringify(compressedHistory));
     console.log(
-      `History compressed: ${estimatedTokens} tokens -> ${compressedSize} tokens (${messagesToSummarize.length} messages summarized, ${recentMessages.length} kept)`
+      `History compressed: ${tokens} tokens -> ${compressedSize} tokens (${messagesToSummarize.length} messages summarized, ${recentMessages.length} kept)`
     );
 
     return {
       history: compressedHistory,
       compressionTokens: data.usage
-        ? {
-            input: data.usage.input_tokens ?? 0,
-            output: data.usage.output_tokens ?? 0,
-          }
+        ? { input: data.usage.input_tokens ?? 0, output: data.usage.output_tokens ?? 0 }
         : undefined,
     };
   } catch (error) {
@@ -802,23 +680,16 @@ ${summaryInput}`,
 
 async function generateReport(
   ctx: Pick<ActionCtx, "runQuery" | "runMutation" | "runAction">,
-  investigationId: string,
-  _conversationHistory: string
+  investigationId: Id<"investigations">
 ) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new Error("ANTHROPIC_API_KEY not set");
 
-  const investigation = await ctx.runQuery(api.investigations.get, {
-    id: investigationId as any,
-  });
+  const investigation = await ctx.runQuery(api.investigations.get, { id: investigationId });
 
-  const findings = await ctx.runQuery(api.investigations.getFindings, {
-    investigationId: investigationId as any,
-  });
+  const findings = await ctx.runQuery(api.investigations.getFindings, { investigationId });
 
-  const steps = await ctx.runQuery(api.investigations.getSteps, {
-    investigationId: investigationId as any,
-  });
+  const steps = await ctx.runQuery(api.investigations.getSteps, { investigationId });
 
   const stepsContext = steps
     .map(
@@ -844,11 +715,9 @@ async function generateReport(
     body: JSON.stringify({
       model: "claude-opus-4-20250514",
       max_tokens: 4096,
-      system: "You are an expert investigator writing a final report. Be thorough, analytical, and cite your sources.",
-      messages: [
-        {
-          role: "user",
-          content: `You are writing the final report for an investigation.
+      messages: [{
+        role: "user",
+        content: `You are writing the final report for an investigation.
 
 Target: ${investigation?.targetName || "Unknown"}
 ${investigation?.targetDescription ? `Description: ${investigation.targetDescription}` : ""}
@@ -868,17 +737,16 @@ Generate a comprehensive detective report. Include:
 6. Recommendations (suggested next steps for further investigation)
 
 Format as markdown. Be thorough and professional.`,
-        },
-      ],
+      }],
     }),
   });
 
   if (!response.ok) {
     const errText = await response.text();
     console.error("Report generation API error:", errText);
-    await cleanupBrowserSession(ctx, investigationId as any);
+    await cleanupBrowserSession(ctx, investigationId);
     await ctx.runMutation(api.investigations.updateStatus, {
-      id: investigationId as any,
+      id: investigationId,
       status: "failed",
       errorMessage: `Report generation failed (${response.status}): ${errText.slice(0, 500)}`,
     });
@@ -887,30 +755,25 @@ Format as markdown. Be thorough and professional.`,
 
   const data = await response.json();
 
-  // Track token usage for report generation
   if (data.usage) {
     await ctx.runMutation(api.investigations.updateTokenUsage, {
-      id: investigationId as any,
+      id: investigationId,
       inputTokens: data.usage.input_tokens ?? 0,
       outputTokens: data.usage.output_tokens ?? 0,
     });
   }
 
-  const report =
-    data.content.find((b: { type: string }) => b.type === "text")?.text || "";
+  const report = data.content.find((b: { type: string }) => b.type === "text")?.text || "";
 
   await ctx.runMutation(api.investigations.updateReport, {
-    id: investigationId as any,
+    id: investigationId,
     report,
     confidence: calculateOverallConfidence(findings),
   });
 
-  await cleanupBrowserSession(ctx, investigationId as any);
+  await cleanupBrowserSession(ctx, investigationId);
 
-  await ctx.runMutation(api.investigations.updateStatus, {
-    id: investigationId as any,
-    status: "complete",
-  });
+  await ctx.runMutation(api.investigations.updateStatus, { id: investigationId, status: "complete" });
 }
 
 function formatInvestigationForOpus(result: {
@@ -952,9 +815,7 @@ function formatInvestigationForOpus(result: {
   if (result.leads_extracted.length > 0) {
     sections.push(`\n--- Extracted Leads (${result.leads_extracted.length} found) ---`);
     for (const lead of result.leads_extracted) {
-      sections.push(
-        `• @${lead.username}${lead.platform ? ` (${lead.platform})` : ""} — ${lead.reason}`
-      );
+      sections.push(`• @${lead.username}${lead.platform ? ` (${lead.platform})` : ""} — ${lead.reason}`);
     }
   }
 
@@ -977,46 +838,19 @@ function formatInvestigationForOpus(result: {
   if (result.lead_graph.length > 0) {
     sections.push(`\n--- Connection Graph ---`);
     for (const edge of result.lead_graph) {
-      sections.push(
-        `@${edge.from} → @${edge.to}${edge.platform ? ` [${edge.platform}]` : ""}: ${edge.reason}`
-      );
+      sections.push(`@${edge.from} → @${edge.to}${edge.platform ? ` [${edge.platform}]` : ""}: ${edge.reason}`);
     }
   }
 
   return sections.join("\n");
 }
 
-function extractUsernamesFromLinks(links: string[]): string[] {
-  const usernames: string[] = [];
-  for (const link of links) {
-    try {
-      const url = new URL(link);
-      const pathParts = url.pathname.split("/").filter(Boolean);
-      if (pathParts.length > 0) {
-        const username = pathParts[pathParts.length - 1].replace(/^@/, "");
-        if (username && !username.includes(".") && username.length > 1) {
-          usernames.push(`@${username}`);
-        }
-      }
-    } catch {
-      // Not a URL, might be a raw username
-      const cleaned = link.trim().replace(/^@/, "");
-      if (cleaned && !cleaned.includes(" ") && cleaned.length > 1) {
-        usernames.push(`@${cleaned}`);
-      }
-    }
-  }
-  return [...new Set(usernames)];
-}
-
 async function cleanupBrowserSession(
   ctx: Pick<ActionCtx, "runQuery" | "runMutation" | "runAction">,
-  investigationId: any
+  investigationId: Id<"investigations">
 ) {
   try {
-    const investigation = await ctx.runQuery(api.investigations.get, {
-      id: investigationId,
-    });
+    const investigation = await ctx.runQuery(api.investigations.get, { id: investigationId });
     if (investigation?.browserSessionId) {
       await ctx.runAction(internal.tools.browserUse.stopSession, {
         sessionId: investigation.browserSessionId,
@@ -1032,9 +866,7 @@ async function cleanupBrowserSession(
   }
 }
 
-function calculateOverallConfidence(
-  findings: { confidence: number }[]
-): number {
+function calculateOverallConfidence(findings: { confidence: number }[]): number {
   if (findings.length === 0) return 0;
   const sum = findings.reduce((acc, f) => acc + f.confidence, 0);
   return Math.round(sum / findings.length);
