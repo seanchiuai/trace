@@ -223,6 +223,7 @@ export const step = internalAction({
       await ctx.runMutation(api.investigations.updateStatus, {
         id: args.investigationId,
         status: "failed",
+        errorMessage: `Anthropic API error (${response.status}): ${errText.slice(0, 500)}`,
       });
       return;
     }
@@ -496,10 +497,13 @@ Format as markdown. Be thorough and professional.`,
   });
 
   if (!response.ok) {
+    const errText = await response.text();
+    console.error("Report generation API error:", errText);
     await cleanupBrowserSession(ctx, investigationId as any);
     await ctx.runMutation(api.investigations.updateStatus, {
       id: investigationId as any,
       status: "failed",
+      errorMessage: `Report generation failed (${response.status}): ${errText.slice(0, 500)}`,
     });
     return;
   }

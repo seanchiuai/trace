@@ -51,11 +51,15 @@ export const updateStatus = mutation({
       v.literal("complete"),
       v.literal("failed")
     ),
+    errorMessage: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const patch: Record<string, unknown> = { status: args.status };
     if (args.status === "complete") {
       patch.completedAt = Date.now();
+    }
+    if (args.status === "failed" && args.errorMessage) {
+      patch.errorMessage = args.errorMessage;
     }
     await ctx.db.patch(args.id, patch);
   },

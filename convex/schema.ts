@@ -20,6 +20,7 @@ export default defineSchema({
     browserLiveUrl: v.optional(v.string()),
     report: v.optional(v.string()),
     confidence: v.optional(v.number()),
+    errorMessage: v.optional(v.string()),
     stepCount: v.number(),
     totalInputTokens: v.optional(v.number()),
     totalOutputTokens: v.optional(v.number()),

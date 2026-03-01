@@ -261,6 +261,30 @@ export default function Investigation() {
         )}
       </motion.header>
 
+      {/* Error banner */}
+      <AnimatePresence>
+        {investigation.status === "failed" && investigation.errorMessage && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            className="border-b border-danger/30 bg-danger/5 px-6 py-3"
+          >
+            <div className="flex items-start gap-3">
+              <span className="text-danger text-sm mt-0.5">!</span>
+              <div className="flex-1 min-w-0">
+                <p className="text-[10px] text-danger font-bold tracking-[0.2em] uppercase mb-1">
+                  Investigation Failed
+                </p>
+                <p className="text-xs text-text-secondary font-mono break-all">
+                  {investigation.errorMessage}
+                </p>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* FaceScan overlay */}
       <AnimatePresence>
         {activeFaceScan && (
