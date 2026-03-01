@@ -1,38 +1,75 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@300;400;500;600;700&display=swap');
 @import "tailwindcss";
 
 @theme {
-  --color-bg-primary: #0a0a0f;
-  --color-bg-secondary: #12121a;
-  --color-bg-card: #1a1a2e;
-  --color-bg-card-hover: #1f1f35;
-  --color-border: #2a2a3e;
-  --color-border-bright: #3a3a5e;
+  /* ── Surface palette ── */
+  --color-bg-primary: #07070c;
+  --color-bg-secondary: #0d0d14;
+  --color-bg-card: #13131f;
+  --color-bg-card-hover: #191928;
+  --color-bg-elevated: #1a1a2a;
+
+  /* ── Border palette ── */
+  --color-border: #1e1e32;
+  --color-border-bright: #2e2e4a;
+  --color-border-accent: rgba(0, 255, 136, 0.2);
+
+  /* ── Accent palette ── */
   --color-accent: #00ff88;
   --color-accent-dim: #00cc6a;
-  --color-accent-glow: rgba(0, 255, 136, 0.3);
-  --color-danger: #ff4444;
-  --color-warning: #ffaa00;
-  --color-info: #4488ff;
-  --color-text-primary: #e8e8f0;
-  --color-text-secondary: #8888aa;
-  --color-text-muted: #555577;
-  --font-mono: "JetBrains Mono", "Fira Code", "SF Mono", monospace;
+  --color-accent-glow: rgba(0, 255, 136, 0.15);
+  --color-accent-bright: #33ffaa;
+
+  /* ── Semantic colors ── */
+  --color-danger: #ff3b4f;
+  --color-warning: #ffb224;
+  --color-info: #3b82f6;
+  --color-success: #00ff88;
+
+  /* ── Text palette ── */
+  --color-text-primary: #e4e4ef;
+  --color-text-secondary: #7e7e9a;
+  --color-text-muted: #4a4a66;
+  --color-text-accent: #00ff88;
+
+  /* ── Font stacks ── */
+  --font-display: "Outfit", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", "Fira Code", monospace;
 }
 
+/* ── Reset ── */
 * {
   box-sizing: border-box;
 }
 
+/* ── Base body ── */
 body {
   margin: 0;
   background-color: var(--color-bg-primary);
   color: var(--color-text-primary);
   font-family: var(--font-mono);
+  font-size: 14px;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Scan line animation for FaceCheck */
+/* ── Film grain overlay ── */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  opacity: 0.025;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+  background-size: 256px 256px;
+}
+
+/* ═══════════════════════════════════════
+   KEYFRAME ANIMATIONS
+   ═══════════════════════════════════════ */
+
+/* FaceCheck scan line */
 @keyframes scanLine {
   0% {
     top: 0;
@@ -71,39 +108,214 @@ body {
   }
 }
 
-/* Pulsing glow for high confidence */
+/* Confidence glow pulse */
 @keyframes confidenceGlow {
   0%,
   100% {
-    box-shadow: 0 0 5px rgba(0, 255, 136, 0.3);
+    box-shadow: 0 0 5px rgba(0, 255, 136, 0.2);
   }
   50% {
-    box-shadow: 0 0 20px rgba(0, 255, 136, 0.8);
+    box-shadow: 0 0 25px rgba(0, 255, 136, 0.6);
   }
 }
 
-/* Pulse animation */
+/* Generic pulse */
 @keyframes pulse {
   0%,
   100% {
     opacity: 1;
   }
   50% {
-    opacity: 0.5;
+    opacity: 0.4;
   }
 }
 
-/* Scrollbar styling */
-::-webkit-scrollbar {
+/* Horizontal scan sweep across elements */
+@keyframes horizontalScan {
+  0% {
+    left: -30%;
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    left: 130%;
+    opacity: 0;
+  }
+}
+
+/* Subtle float for atmospheric elements */
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+/* Typing cursor blink */
+@keyframes cursorBlink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+/* Grid fade in */
+@keyframes gridFadeIn {
+  0% { opacity: 0; }
+  100% { opacity: 0.04; }
+}
+
+/* Data stream — vertical scroll of characters */
+@keyframes dataStream {
+  0% {
+    transform: translateY(-100%);
+  }
+  100% {
+    transform: translateY(100%);
+  }
+}
+
+/* Radar sweep */
+@keyframes radarSweep {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+/* ═══════════════════════════════════════
+   UTILITY CLASSES
+   ═══════════════════════════════════════ */
+
+/* Display font utility */
+.font-display {
+  font-family: var(--font-display);
+}
+
+/* HUD corner brackets — add to a positioned container */
+.hud-corners::before,
+.hud-corners::after {
+  content: "";
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  border-color: var(--color-accent);
+  opacity: 0.5;
+  pointer-events: none;
+  transition: opacity 0.3s;
+}
+
+.hud-corners::before {
+  top: -1px;
+  left: -1px;
+  border-top: 2px solid;
+  border-left: 2px solid;
+}
+
+.hud-corners::after {
+  bottom: -1px;
+  right: -1px;
+  border-bottom: 2px solid;
+  border-right: 2px solid;
+}
+
+.hud-corners:hover::before,
+.hud-corners:hover::after {
+  opacity: 1;
+}
+
+/* Additional corners (requires child elements) */
+.hud-corners-full {
+  position: relative;
+}
+.hud-corners-full > .corner-tr,
+.hud-corners-full > .corner-bl {
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  border-color: var(--color-accent);
+  opacity: 0.5;
+  pointer-events: none;
+  transition: opacity 0.3s;
+}
+.hud-corners-full > .corner-tr {
+  top: -1px;
+  right: -1px;
+  border-top: 2px solid;
+  border-right: 2px solid;
+}
+.hud-corners-full > .corner-bl {
+  bottom: -1px;
+  left: -1px;
+  border-bottom: 2px solid;
+  border-left: 2px solid;
+}
+
+/* Accent glow line — horizontal rule */
+.glow-line {
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--color-accent) 20%,
+    var(--color-accent) 80%,
+    transparent
+  );
+  opacity: 0.3;
+}
+
+/* Status dot — pulsing indicator */
+.status-dot {
   width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  box-shadow: 0 0 8px var(--color-accent-glow);
+  animation: pulse 2s ease-in-out infinite;
 }
+
+/* Atmospheric grid background */
+.grid-bg {
+  background-image:
+    linear-gradient(rgba(0, 255, 136, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 255, 136, 0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+/* ═══════════════════════════════════════
+   SCROLLBAR
+   ═══════════════════════════════════════ */
+
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
 ::-webkit-scrollbar-track {
-  background: var(--color-bg-primary);
+  background: transparent;
 }
+
 ::-webkit-scrollbar-thumb {
   background: var(--color-border);
-  border-radius: 3px;
+  border-radius: 10px;
 }
+
 ::-webkit-scrollbar-thumb:hover {
   background: var(--color-border-bright);
+}
+
+/* ═══════════════════════════════════════
+   SELECTION
+   ═══════════════════════════════════════ */
+
+::selection {
+  background: rgba(0, 255, 136, 0.2);
+  color: var(--color-text-primary);
 }
