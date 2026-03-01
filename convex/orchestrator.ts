@@ -276,12 +276,12 @@ export const step = internalAction({
     let hasNonSaveFinding = false;
     let currentStepNumber = stepNumber;
 
-    for (const tc of toolCalls) {
-      if (tc.tool !== "save_finding") {
-        hasNonSaveFinding = true;
-        currentStepNumber = (await ctx.runQuery(api.investigations.get, { id: args.investigationId }))?.stepCount ?? currentStepNumber;
-        currentStepNumber += 1;
-      }
+    // Separate instant save_finding calls from expensive tool calls
+    const saveFindingCalls = toolCalls.filter(tc => tc.tool === "save_finding");
+    const expensiveCalls = toolCalls.filter(tc => tc.tool !== "save_finding");
+
+    // Run save_findings first (instant, sequential is fine)
+    for (const tc of saveFindingCalls) {
       const result = await executeToolCall(ctx, {
         investigationId: args.investigationId,
         investigation,
@@ -289,6 +289,25 @@ export const step = internalAction({
         stepNumber: currentStepNumber,
       });
       toolResults.push({ id: tc.id, tool: tc.tool, result });
+    }
+
+    // Run expensive tools (web_search, browser_action, etc.) in parallel
+    if (expensiveCalls.length > 0) {
+      hasNonSaveFinding = true;
+      const baseStep = (await ctx.runQuery(api.investigations.get, { id: args.investigationId }))?.stepCount ?? currentStepNumber;
+
+      const parallelResults = await Promise.all(
+        expensiveCalls.map((tc, i) =>
+          executeToolCall(ctx, {
+            investigationId: args.investigationId,
+            investigation,
+            toolCall: tc,
+            stepNumber: baseStep + i + 1,
+          }).then(result => ({ id: tc.id, tool: tc.tool, result }))
+        )
+      );
+      toolResults.push(...parallelResults);
+      currentStepNumber = baseStep + expensiveCalls.length;
     }
 
     let consecutiveSaveOnly = args.consecutiveSaveOnlySteps ?? 0;
