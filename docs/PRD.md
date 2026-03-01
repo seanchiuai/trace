@@ -22,8 +22,8 @@ AI-powered missing persons investigation tool. User provides name, description, 
 - [x] Python FastAPI sidecar wraps Maigret CLI
 - [x] GET /search?username=X returns structured JSON
 - [x] Convex action calls sidecar via HTTP
-- [ ] Results displayed in activity stream
-- [ ] Opus filters false positives using known info
+- [x] Results displayed in activity stream
+- [x] Opus filters false positives using known info (via reasoning + confidence scores)
 
 ### US-003: Browser Use Integration
 **As a** system, **I want to** control a cloud browser **so that** the AI can navigate social media profiles and extract information.
@@ -33,7 +33,7 @@ AI-powered missing persons investigation tool. User provides name, description, 
 - [x] Convex action runs tasks with natural language instructions
 - [x] Browser session ID stored on investigation
 - [x] Live URL stored for iframe embedding
-- [ ] Live browser iframe visible in investigation dashboard
+- [x] Live browser iframe visible in investigation dashboard
 - [ ] Screenshots captured and stored
 
 ### US-004: Opus Orchestrator Loop
@@ -49,9 +49,12 @@ AI-powered missing persons investigation tool. User provides name, description, 
 - [ ] End-to-end loop tested with real API keys
 
 
+### US-005: Reverse Image / Geolocation Search
+**As a** system, **I want to** reverse-search images and geolocate photos **so that** we discover location data and visual matches.
+
 **Acceptance Criteria:**
 - [x] Returns matching URLs with confidence scores and platform detection
-- [ ] Scan animation → face brackets → match cards with confidence ticker
+- [ ] Scan animation -> face brackets -> match cards with confidence ticker
 
 ### US-006: Live Investigation Dashboard
 **As a** user, **I want to** watch the investigation in real-time **so that** I can see what the AI is doing and discovering.
@@ -63,8 +66,8 @@ AI-powered missing persons investigation tool. User provides name, description, 
 - [x] Findings grid shows evidence cards with confidence badges
 - [x] Browser view component with iframe + URL bar
 - [x] Auto-starts investigation on page load
-- [ ] Steps stream in real-time via Convex subscription (verified live)
-- [ ] Browser iframe actually loads Browser Use live URL
+- [x] Steps stream in real-time via Convex subscription
+- [x] Browser iframe loads Browser Use live URL
 
 ### US-008: Detective Report
 **As a** user, **I want to** see a comprehensive investigation report **so that** I can review all findings in one place.
@@ -77,6 +80,7 @@ AI-powered missing persons investigation tool. User provides name, description, 
 - [ ] Report renders formatted markdown (not raw pre block)
 - [ ] Export as PDF
 
+### US-009: Face Scanning Animation
 **As a** demo viewer, **I want to** see a dramatic face scanning animation **so that** the demo is memorable.
 
 **Acceptance Criteria:**
@@ -91,7 +95,7 @@ AI-powered missing persons investigation tool. User provides name, description, 
 **As a** user, **I want** the app to have a dark, detective-themed aesthetic **so that** it feels professional and appropriate.
 
 **Acceptance Criteria:**
-- [x] Dark background (#0a0a0f primary, #12121a secondary)
+- [x] Dark background (#07070c primary, #0d0d14 secondary)
 - [x] Green accent (#00ff88) for highlights and active states
 - [x] Monospace font (JetBrains Mono / Fira Code)
 - [x] Custom scrollbar styling

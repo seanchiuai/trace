@@ -8,6 +8,7 @@
 | 2 | Maigret sidecar (FastAPI + wrapper) | Complete |
 | 3 | Browser Use integration | Complete |
 | 4 | Opus orchestrator loop | Complete |
+| 5 | Reverse image search + geolocation tools | Complete |
 | 6 | Frontend: input form + live browser + activity stream | Complete |
 | 7 | Laminar observability tree | Backlog (cut candidate) |
 | 8 | Detective report generation + UI | Complete |
@@ -42,6 +43,23 @@
 - [x] Create CompletionFlash component (investigation completion overlay)
 - [x] Create Report page (/report/:id with DetectiveReport)
 - [x] Noir redesign: Outfit + JetBrains Mono fonts, updated color palette, HUD elements, film grain
+- [x] Add Picarta AI geolocation tool (convex/tools/picarta.ts)
+- [x] Add reverse image search tool via SerpAPI (convex/tools/reverseImageSearch.ts)
+- [x] Add Intelligence X dark web search tool (convex/tools/intelx.ts)
+- [x] Add extreme mode toggle (WhitePages + dark web search)
+- [x] Add graph_edges table and relationship tracking (convex/graphEdges.ts)
+- [x] Create RelationshipGraph component (react-force-graph-2d)
+- [x] Create GeoIntelMap component (Leaflet with dark CARTO tiles)
+- [x] Create ViewSwitcher component (Browser/Graph/Map views)
+- [x] Create BehavioralProfile component (timezone, username patterns, interests)
+- [x] Create All Runs page (/runs with investigation listing)
+- [x] Add behavioral analysis via Sonnet in report generation
+- [x] Add latitude/longitude fields to findings schema
+- [x] Add useGraphData hook for graph data transformation
+- [x] Upgrade Browser Use integration from v2 to v3 API
+- [x] Add 5 new orchestrator tools (geospy, geo_locate, whitepages, reverse_image, darkweb)
+- [x] Add parallel tool execution in orchestrator (Promise.allSettled)
+- [x] Add token usage tracking and cost estimation
 
 ## Active
 
@@ -57,12 +75,11 @@
 ### Phase 3: Browser Use Testing
 - [ ] Set BROWSER_USE_API_KEY in Convex environment
 - [ ] Test session creation and task execution end-to-end
-- [ ] Verify live URL works in iframe
 
 ### Phase 4: Opus Orchestrator Testing
 - [ ] Set ANTHROPIC_API_KEY in Convex environment
 - [ ] Run end-to-end investigation with a test target
-- [ ] Verify tool dispatch works for all 6 tools
+- [ ] Verify tool dispatch works for all 10 tools
 - [ ] Test conversation history accumulation across steps
 - [ ] Test max step limit enforcement (20 steps)
 - [ ] Test report generation on "done" tool call
