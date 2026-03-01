@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { Fragment, useEffect, useMemo, useRef } from "react";
 import { MapContainer, TileLayer, Marker, Circle, Popup, useMap } from "react-leaflet";
 import L from "leaflet";
 
@@ -179,7 +179,7 @@ export default function GeoIntelMap({ findings }: Props) {
                 : "#f97316";
 
           return (
-            <div key={marker.id}>
+            <Fragment key={marker.id}>
               <Circle
                 center={[marker.lat, marker.lng]}
                 radius={radiusMeters}
@@ -211,7 +211,7 @@ export default function GeoIntelMap({ findings }: Props) {
                   </div>
                 </Popup>
               </Marker>
-            </div>
+            </Fragment>
           );
         })}
       </MapContainer>

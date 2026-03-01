@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useMutation, useAction } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
@@ -23,24 +23,28 @@ export default function ClarificationCard({
   const [customText, setCustomText] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [secondsLeft, setSecondsLeft] = useState(AUTO_SKIP_SECONDS);
+  const submittedRef = useRef(false);
 
   const respondToClarification = useMutation(api.investigations.respondToClarification);
   const resumeFromClarification = useAction(api.orchestrator.resumeFromClarification);
 
   const handleSubmit = useCallback(async (answer: string) => {
-    if (submitting) return;
+    if (submittedRef.current) return;
+    submittedRef.current = true;
     setSubmitting(true);
     try {
       await respondToClarification({ id: clarificationId, response: answer });
       await resumeFromClarification({ clarificationId });
     } catch (e) {
       console.error("Failed to submit clarification:", e);
+      submittedRef.current = false;
       setSubmitting(false);
     }
-  }, [submitting, clarificationId, respondToClarification, resumeFromClarification]);
+  }, [clarificationId, respondToClarification, resumeFromClarification]);
 
   const handleSkip = useCallback(async () => {
-    if (submitting) return;
+    if (submittedRef.current) return;
+    submittedRef.current = true;
     setSubmitting(true);
     try {
       // Respond with "Not sure" and resume — same flow as a normal answer
@@ -48,9 +52,10 @@ export default function ClarificationCard({
       await resumeFromClarification({ clarificationId });
     } catch (e) {
       console.error("Failed to skip clarification:", e);
+      submittedRef.current = false;
       setSubmitting(false);
     }
-  }, [submitting, clarificationId, respondToClarification, resumeFromClarification]);
+  }, [clarificationId, respondToClarification, resumeFromClarification]);
 
   // Auto-skip countdown
   useEffect(() => {
