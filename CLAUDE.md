@@ -26,6 +26,7 @@ cd sidecar && pip install -r requirements.txt && python server.py
 - **Browser Use API** — Cloud browser automation
 - **FaceCheck.id API** — Facial recognition search
 - **Maigret** — Username OSINT (Python sidecar via FastAPI)
+
 ## Architecture
 
 ```

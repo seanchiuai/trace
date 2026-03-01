@@ -80,17 +80,16 @@
 - [ ] Verify Browser Use iframe loads live URL
 - [ ] Test activity stream auto-scroll and animation
 
-
-### Phase 8: Laminar (cut candidate)
+### Phase 7: Laminar (cut candidate)
 - [ ] Evaluate if Laminar adds enough value for demo
 - [ ] If keeping: add observability tree view component
 
-### Phase 9: Detective Report
+### Phase 8: Detective Report
 - [ ] Render report as formatted markdown (not raw pre)
 - [ ] Add export-to-PDF functionality
 - [ ] Style report page with detective board aesthetic
 
-### Phase 10: Polish
+### Phase 9: Polish
 - [ ] Verify no default Vite styles leaking
 - [ ] Test all animations in browser (FaceScan sequence, activity stream)
 - [ ] Add loading states for all async operations
