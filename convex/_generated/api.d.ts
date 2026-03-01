@@ -13,7 +13,6 @@ import type * as orchestrator from "../orchestrator.js";
 import type * as reports from "../reports.js";
 import type * as tools_braveSearch from "../tools/braveSearch.js";
 import type * as tools_browserUse from "../tools/browserUse.js";
-import type * as tools_faceCheck from "../tools/faceCheck.js";
 import type * as tools_maigret from "../tools/maigret.js";
 
 import type {
@@ -28,7 +27,6 @@ declare const fullApi: ApiFromModules<{
   reports: typeof reports;
   "tools/braveSearch": typeof tools_braveSearch;
   "tools/browserUse": typeof tools_browserUse;
-  "tools/faceCheck": typeof tools_faceCheck;
   "tools/maigret": typeof tools_maigret;
 }>;
 
