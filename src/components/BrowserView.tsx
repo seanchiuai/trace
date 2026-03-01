@@ -80,7 +80,7 @@ export default function BrowserView({ liveUrl, status }: BrowserViewProps) {
   return (
     <div
       className="h-full w-full relative rounded-xl overflow-hidden hud-corners"
-      style={{ isolation: "isolate", contain: "strict" }}
+      style={{ isolation: "isolate" }}
     >
       {/* Vignette overlay */}
       <div
@@ -106,13 +106,13 @@ export default function BrowserView({ liveUrl, status }: BrowserViewProps) {
         </span>
       </div>
 
-      {/* iframe — full-bleed, isolated so it doesn't starve the compositor */}
+      {/* iframe — full-bleed, no sandbox to allow Browser Use live stream */}
       <iframe
         src={liveUrl}
         className="w-full h-full bg-black rounded-xl"
         title="Browser Use Live View"
-        sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
-        loading="lazy"
+        allow="clipboard-read; clipboard-write"
+        referrerPolicy="no-referrer"
       />
     </div>
   );
