@@ -1,7 +1,8 @@
 import { v } from "convex/values";
 import { internalAction } from "../_generated/server";
 
-const INTELX_API = "https://2.intelx.io";
+// free.intelx.io for free keys, 2.intelx.io for paid keys
+const INTELX_API = process.env.INTELX_API_URL || "https://free.intelx.io";
 const MAX_POLL_ATTEMPTS = 15;
 const POLL_INTERVAL_MS = 2000;
 
