@@ -63,6 +63,7 @@ Defined as Anthropic tool schemas in the `step` function:
 | `maigret_search` | `username` | `internal.tools.maigret.search` | Profile URLs + metadata JSON |
 | `browser_action` | `instruction` | `internal.tools.browserUse.runTask` | `output` text from browser |
 | `face_check` | `imageUrl` | `internal.tools.faceCheck.searchByImage` | Matching profiles + scores |
+| `web_search` | `query, count?` | `internal.tools.braveSearch.search` | Titles, URLs, snippets (Brave Search API) |
 | `save_finding` | `source, category, data, confidence, platform?, profileUrl?` | `api.investigations.addFinding` | "Finding saved successfully." |
 | `done` | `summary` | `generateReport()` | Ends loop, generates report |
 
