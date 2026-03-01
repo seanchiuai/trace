@@ -297,7 +297,19 @@ export default function InputForm({ onSubmit, loading }: InputFormProps) {
         >
           <button
             type="button"
-            onClick={() => setExtremeMode(!extremeMode)}
+            onClick={() => {
+              setExtremeMode((prev) => {
+                if (prev) {
+                  // Turning off: clear extreme tools from disabled set
+                  setDisabledTools((dt) => {
+                    const next = new Set(dt);
+                    EXTREME_TOOLS.forEach((t) => next.delete(t.name));
+                    return next;
+                  });
+                }
+                return !prev;
+              });
+            }}
             className={`w-full flex items-center justify-between px-4 py-3 rounded-lg border transition-all duration-300 ${
               extremeMode
                 ? "border-red-500/50 bg-red-500/5 shadow-[0_0_20px_rgba(239,68,68,0.08)]"
