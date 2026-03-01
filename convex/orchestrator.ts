@@ -102,10 +102,6 @@ Before each action, review your previous steps. Do NOT:
 - Quality over quantity — one good verified finding beats five unverified ones`;
 }
 
-/**
- * Build a status line injected into the context so the agent knows its state.
- * Factor 3 (Own Your Context Window) + Factor 5 (Unified State) + Factor 13 (Pre-fetch)
- */
 function buildStepContext(params: {
   stepNumber: number;
   maxSteps: number;
@@ -139,16 +135,11 @@ function buildStepContext(params: {
   return parts.join("\n");
 }
 
-/**
- * Format tool results with appropriate truncation per tool type.
- * Factor 3 (Own Your Context Window) — maximize information density.
- */
 function formatToolResult(tool: string, rawResult: string): string {
   const MAX_CONTEXT_CHARS = 3500;
 
   switch (tool) {
     case "web_search": {
-      // Parse and format for density — only title + URL + short description
       try {
         const parsed = JSON.parse(rawResult);
         if (parsed.results && Array.isArray(parsed.results)) {
@@ -163,14 +154,12 @@ function formatToolResult(tool: string, rawResult: string): string {
     }
 
     case "browser_action":
-      // Browser results are already summarized by Browser Use — keep them but cap size
       return rawResult.slice(0, MAX_CONTEXT_CHARS);
 
     case "save_finding":
       return "Finding saved.";
 
-    case "maigret":
-      // Already formatted by formatInvestigationForOpus — allow more space for this high-value result
+    case "maigret_search":
       return rawResult.slice(0, 5000);
 
     default:
@@ -418,44 +407,36 @@ export const step = internalAction({
     let browserActionsUsed = args.browserActionsUsed ?? 0;
     let consecutiveErrors = args.consecutiveErrors ?? 0;
 
-    // Factor 13: Pre-fetch findings count for step context
     const findings = await ctx.runQuery(api.investigations.getFindings, { investigationId: args.investigationId });
-    const findingsCount = findings.length;
-
     const stepNumber = investigation.stepCount + 1;
 
-    // Factor 3 + 5: Build step context and inject into the last user message
     const stepContext = buildStepContext({
       stepNumber,
       maxSteps: MAX_STEPS,
-      findingsCount,
+      findingsCount: findings.length,
       browserActionsUsed,
       maxBrowserActions: MAX_BROWSER_ACTIONS,
       consecutiveErrors,
     });
 
-    // Filter tools based on availability and limits
     const tools = TOOL_DEFINITIONS.filter((t) => {
       if (t.name === "maigret_search" && !maigretAvailable) return false;
       if (t.name === "whitepages_lookup" && !extremeMode) return false;
       if (t.name === "darkweb_search" && !extremeMode) return false;
-      // Factor 9: Remove browser_action from available tools when limit reached
       if (t.name === "browser_action" && browserActionsUsed >= MAX_BROWSER_ACTIONS) return false;
       return true;
     });
 
-    // Inject step context as a system-level status line appended to the last user message
+    // Append step context to the last user message so the LLM sees its budget/state
     const messagesWithContext = [...conversationHistory];
     const lastMsg = messagesWithContext[messagesWithContext.length - 1];
     if (lastMsg && lastMsg.role === "user") {
       if (Array.isArray(lastMsg.content)) {
-        // Tool results — append step context as a text block
         messagesWithContext[messagesWithContext.length - 1] = {
           ...lastMsg,
-          content: [...(lastMsg.content as unknown[]), { type: "text", text: `\n${stepContext}` }],
+          content: [...lastMsg.content, { type: "text", text: `\n${stepContext}` }],
         };
       } else {
-        // Text message — append
         messagesWithContext[messagesWithContext.length - 1] = {
           ...lastMsg,
           content: `${lastMsg.content}\n\n${stepContext}`,
@@ -550,7 +531,6 @@ export const step = internalAction({
       currentStepNumber = stepNumber + 1;
     }
 
-    // Track browser actions used this step
     const browserCalls = toolCalls.filter((tc) => tc.tool === "browser_action");
     const parallelCalls = toolCalls.filter((tc) => tc.tool !== "browser_action");
 
@@ -603,11 +583,11 @@ export const step = internalAction({
       toolResults.find((tr) => tr.id === tc.id) ?? { id: tc.id, tool: tc.tool, result: "Tool execution failed" }
     );
 
-    // Factor 9: Track consecutive errors for escalation
-    const stepHasErrors = orderedResults.some((tr) =>
-      tr.result.includes("Tool error:") || tr.result.includes("RECOVERY:") || tr.result.includes("timed out")
+    const nonSaveResults = orderedResults.filter((tr) => tr.tool !== "save_finding");
+    const allToolsFailed = nonSaveResults.length > 0 && nonSaveResults.every((tr) =>
+      tr.result.startsWith("Tool error:") || tr.result.includes("RECOVERY:")
     );
-    if (stepHasErrors) {
+    if (allToolsFailed) {
       consecutiveErrors++;
       if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
         console.warn(`[escalation] ${consecutiveErrors} consecutive errors — forcing report generation`);
@@ -640,7 +620,6 @@ export const step = internalAction({
     }));
     await ctx.runMutation(api.investigations.addSteps, { steps: stepEntries });
 
-    // Factor 3: Use smart per-tool truncation instead of blind 4000-char slice
     const toolResultBlocks = orderedResults.map((tr) => ({
       type: "tool_result",
       tool_use_id: tr.id,

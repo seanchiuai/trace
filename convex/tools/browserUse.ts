@@ -231,7 +231,7 @@ export const runTask = internalAction({
         };
       }
 
-      // Terminal errors — return gracefully instead of throwing
+      // Terminal states — return with recovery hints instead of throwing
       if (session.status === "error") {
         return {
           output: session.output
@@ -256,7 +256,6 @@ export const runTask = internalAction({
       // "running" or "created" — keep polling
     }
 
-    // Polling exhausted — return gracefully instead of throwing
     return {
       output: "Browser task timed out after extended polling. RECOVERY: Do NOT retry with browser_action. Use web_search instead — it returns results in <1 second.",
       sessionId,
