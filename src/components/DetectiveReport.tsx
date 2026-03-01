@@ -45,6 +45,7 @@ const TOOL_LABELS: Record<string, string> = {
   browser_action: "Web Recon",
   face_check: "Face Match",
   save_finding: "Intel Logged",
+  web_search: "Web Search",
 };
 
 function formatCaseNumber(id: string): string {

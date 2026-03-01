@@ -44,6 +44,12 @@ export const TOOL_CONFIG: Record<
     bg: "bg-yellow-400/10",
     border: "border-yellow-400/20",
   },
+  web_search: {
+    letter: "W",
+    color: "text-orange-400",
+    bg: "bg-orange-400/10",
+    border: "border-orange-400/20",
+  },
 };
 
 export function ToolBadge({ tool, size = "md" }: { tool: string; size?: "sm" | "md" }) {
