@@ -13,7 +13,7 @@ function estimateTokens(text: string): number {
   return Math.ceil(text.length / 3.5);
 }
 
-function buildSystemPrompt(maigretAvailable: boolean): string {
+function buildSystemPrompt(maigretAvailable: boolean, extremeMode: boolean = false): string {
   const toolLines: string[] = [];
   let n = 1;
   if (maigretAvailable) {
@@ -24,6 +24,16 @@ function buildSystemPrompt(maigretAvailable: boolean): string {
   toolLines.push(
     `${n++}. browser_action(instruction) — Control a web browser. Give clear instructions like "Go to imginn.com/username and report what you see." IMPORTANT: For Instagram profiles, ALWAYS use imginn.com (e.g. imginn.com/username) instead of instagram.com — it shows public profiles without login walls. Returns screenshots and page text. Use for interactive pages that require scrolling or JS rendering. EXPENSIVE — prefer web_search for simple lookups.`,
     `${n++}. web_search(query, count?) — Fast web search. Returns titles, URLs, and snippets. Use this FIRST for simple lookups like "John Smith LinkedIn", "username site:twitter.com", company info, news articles, etc. Much faster and cheaper than browser_action.`,
+    `${n++}. geospy_predict(imageUrl) — AI photo geolocation. Upload a photo URL and get predicted GPS coordinates, city, country, and an explanation of the visual clues used. Use on any image that might reveal a location (street views, landmarks, scenery).`,
+    `${n++}. reverse_image_search(imageUrl) — Reverse image search. Find where a photo appears online — social profiles, news articles, blogs. Returns visual matches, knowledge graph identity, and text in the image.`
+  );
+  if (extremeMode) {
+    toolLines.push(
+      `${n++}. whitepages_lookup(name?, phone?, city?, stateCode?) — Deep person lookup using WhitePages. Search by name, phone number, or both. Returns real addresses (with lat/lng), age range, phone numbers, and associated people. Use when you have a name or phone number and need real-world identity data.`,
+      `${n++}. darkweb_search(term, maxResults?) — Search dark web, leaked databases, and paste sites. Find breach records, leaked credentials, and data dump mentions for an email, username, phone, or domain. Use to uncover hidden connections or verify identities.`
+    );
+  }
+  toolLines.push(
     `${n++}. save_finding(source, category, platform, data, confidence) — Save a confirmed finding. Categories: "social", "connection", "location", "activity", "identity". FREE — does not count toward your step budget. Save findings liberally as you discover them.`,
     `${n++}. done(report) — End the investigation and generate the final report.`
   );
@@ -34,9 +44,12 @@ function buildSystemPrompt(maigretAvailable: boolean): string {
       ? [`  - Username known → start with maigret_search to cast a wide OSINT net`]
       : []),
     `  - Only a name → use web_search to find usernames, profiles, and leads first`,
-    `  - Photo available → use web_search with image-related queries to find visual matches`,
+    `  - Photo available → use geospy_predict to geolocate the photo; use reverse_image_search to find where it appears online`,
     `  - Social links provided → explore those profiles directly (web_search or browser_action)`,
-    `  - Phone number → search it via web_search`,
+    `  - Phone number → search it via web_search${extremeMode ? "; also use whitepages_lookup for deep identity data" : ""}`,
+    ...(extremeMode
+      ? [`  - Email/username known → use darkweb_search to check for leaked records, breach data, and paste site mentions`]
+      : []),
     `- Consider the target type and pick platforms accordingly:`,
     `  - Younger person → prioritize TikTok, Instagram, Snapchat, Discord`,
     `  - Professional → prioritize LinkedIn, GitHub, company pages`,
@@ -106,6 +119,69 @@ const TOOL_DEFINITIONS = [
     },
   },
   {
+    name: "geospy_predict",
+    description:
+      "AI geolocation — upload a photo and get predicted GPS coordinates, city, country, and an explanation of visual clues. Use on any photo that might reveal a location.",
+    input_schema: {
+      type: "object",
+      properties: {
+        imageUrl: {
+          type: "string",
+          description: "URL of the image to geolocate",
+        },
+      },
+      required: ["imageUrl"],
+    },
+  },
+  {
+    name: "whitepages_lookup",
+    description:
+      "Deep person lookup — search by name, phone number, or both. Returns real addresses, age, phone numbers, and associated people. EXTREME MODE ONLY.",
+    input_schema: {
+      type: "object",
+      properties: {
+        name: { type: "string", description: "Full name to search" },
+        phone: { type: "string", description: "Phone number to search" },
+        city: { type: "string", description: "City to narrow results" },
+        stateCode: { type: "string", description: "Two-letter state code" },
+      },
+    },
+  },
+  {
+    name: "reverse_image_search",
+    description:
+      "Reverse image search — find where a photo appears online. Returns visual matches (pages containing the image), knowledge graph identity, and text found in/near the image. Use on any photo of the target to find social profiles, news articles, or other appearances.",
+    input_schema: {
+      type: "object",
+      properties: {
+        imageUrl: {
+          type: "string",
+          description: "URL of the image to reverse search",
+        },
+      },
+      required: ["imageUrl"],
+    },
+  },
+  {
+    name: "darkweb_search",
+    description:
+      "Search dark web, leaked databases, and paste sites for mentions of an email, username, phone number, or domain. Returns breach records, paste appearances, and leaked data references. EXTREME MODE ONLY.",
+    input_schema: {
+      type: "object",
+      properties: {
+        term: {
+          type: "string",
+          description: "Email, username, phone number, or domain to search for in leaked/dark web data",
+        },
+        maxResults: {
+          type: "number",
+          description: "Maximum results to return (default 10, max 20)",
+        },
+      },
+      required: ["term"],
+    },
+  },
+  {
     name: "save_finding",
     description: "Save a confirmed finding from the investigation. FREE — does not count toward your step budget.",
     input_schema: {
@@ -164,6 +240,8 @@ export const startInvestigation = action({
     else
       infoLines.push(`No photo provided`);
 
+    const extremeMode = investigation.extremeMode ?? false;
+
     await ctx.scheduler.runAfter(0, internal.orchestrator.step, {
       investigationId: args.investigationId,
       conversationHistory: JSON.stringify([{
@@ -172,6 +250,7 @@ export const startInvestigation = action({
       }]),
       consecutiveSaveOnlySteps: 0,
       maigretAvailable,
+      extremeMode,
     });
   },
 });
@@ -182,6 +261,7 @@ export const step = internalAction({
     conversationHistory: v.string(),
     consecutiveSaveOnlySteps: v.optional(v.number()),
     maigretAvailable: v.optional(v.boolean()),
+    extremeMode: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const investigation = await ctx.runQuery(api.investigations.get, { id: args.investigationId });
@@ -197,9 +277,13 @@ export const step = internalAction({
     if (!apiKey) throw new Error("ANTHROPIC_API_KEY not set");
 
     const maigretAvailable = args.maigretAvailable ?? false;
-    const tools = maigretAvailable
-      ? TOOL_DEFINITIONS
-      : TOOL_DEFINITIONS.filter((t) => t.name !== "maigret_search");
+    const extremeMode = args.extremeMode ?? false;
+    const tools = TOOL_DEFINITIONS.filter((t) => {
+      if (t.name === "maigret_search" && !maigretAvailable) return false;
+      if (t.name === "whitepages_lookup" && !extremeMode) return false;
+      if (t.name === "darkweb_search" && !extremeMode) return false;
+      return true;
+    });
 
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -211,7 +295,7 @@ export const step = internalAction({
       body: JSON.stringify({
         model: "claude-opus-4-20250514",
         max_tokens: 2048,
-        system: buildSystemPrompt(maigretAvailable),
+        system: buildSystemPrompt(maigretAvailable, extremeMode),
         messages: conversationHistory,
         tools,
       }),
@@ -340,6 +424,7 @@ export const step = internalAction({
       conversationHistory: JSON.stringify(finalHistory),
       consecutiveSaveOnlySteps: consecutiveSaveOnly,
       maigretAvailable,
+      extremeMode,
     });
   },
 });
@@ -438,6 +523,111 @@ async function executeToolCall(
           count: toolCall.args.count as number | undefined,
         });
         return JSON.stringify(searchResult);
+      }
+
+      case "geospy_predict": {
+        await ctx.runMutation(api.investigations.addStep, {
+          investigationId,
+          stepNumber,
+          action: `GeoSpy: Geolocating image from ${(toolCall.args.imageUrl as string).slice(0, 100)}`,
+          tool: "geospy",
+        });
+        const geoResult = await ctx.runAction(internal.tools.geoSpy.predict, {
+          imageUrl: toolCall.args.imageUrl as string,
+        });
+        // Auto-save location finding
+        if (geoResult.city || geoResult.country) {
+          const locationParts = [geoResult.city, geoResult.state, geoResult.country].filter(Boolean);
+          await ctx.runMutation(api.investigations.addFinding, {
+            investigationId,
+            source: "geospy",
+            category: "location",
+            data: `Photo geolocated to ${locationParts.join(", ")} (${geoResult.latitude}, ${geoResult.longitude}). ${geoResult.explanation || ""}`,
+            confidence: 70,
+          });
+        }
+        return JSON.stringify(geoResult);
+      }
+
+      case "whitepages_lookup": {
+        await ctx.runMutation(api.investigations.addStep, {
+          investigationId,
+          stepNumber,
+          action: `WhitePages: Looking up ${toolCall.args.name || toolCall.args.phone || "target"}`,
+          tool: "whitepages",
+        });
+        const wpResult = await ctx.runAction(internal.tools.whitePages.findPerson, {
+          name: toolCall.args.name as string | undefined,
+          phone: toolCall.args.phone as string | undefined,
+          city: toolCall.args.city as string | undefined,
+          stateCode: toolCall.args.stateCode as string | undefined,
+        });
+        return JSON.stringify(wpResult);
+      }
+
+      case "reverse_image_search": {
+        await ctx.runMutation(api.investigations.addStep, {
+          investigationId,
+          stepNumber,
+          action: `Reverse Image Search: ${(toolCall.args.imageUrl as string).slice(0, 100)}`,
+          tool: "reverse_image",
+        });
+        const risResult = await ctx.runAction(internal.tools.reverseImageSearch.search, {
+          imageUrl: toolCall.args.imageUrl as string,
+        });
+        // Auto-save top 3 visual matches as social findings
+        if (risResult.visualMatches && risResult.visualMatches.length > 0) {
+          for (const match of risResult.visualMatches.slice(0, 3)) {
+            if (match.title && match.url) {
+              await ctx.runMutation(api.investigations.addFinding, {
+                investigationId,
+                source: "reverse_image_search",
+                category: "social",
+                platform: match.source || undefined,
+                profileUrl: match.url || undefined,
+                data: `Image found on: ${match.title} (${match.source || "unknown source"})`,
+                confidence: 60,
+              });
+            }
+          }
+        }
+        // Auto-save knowledge graph as identity finding
+        if (risResult.knowledgeGraph?.title) {
+          await ctx.runMutation(api.investigations.addFinding, {
+            investigationId,
+            source: "reverse_image_search",
+            category: "identity",
+            profileUrl: risResult.knowledgeGraph.link || undefined,
+            data: `Identified via reverse image: ${risResult.knowledgeGraph.title}${risResult.knowledgeGraph.subtitle ? ` — ${risResult.knowledgeGraph.subtitle}` : ""}${risResult.knowledgeGraph.description ? `. ${risResult.knowledgeGraph.description}` : ""}`,
+            confidence: 75,
+          });
+        }
+        return JSON.stringify(risResult);
+      }
+
+      case "darkweb_search": {
+        await ctx.runMutation(api.investigations.addStep, {
+          investigationId,
+          stepNumber,
+          action: `Dark Web Search: "${(toolCall.args.term as string).slice(0, 100)}"`,
+          tool: "darkweb",
+        });
+        const dwResult = await ctx.runAction(internal.tools.intelx.search, {
+          term: toolCall.args.term as string,
+          maxResults: toolCall.args.maxResults as number | undefined,
+        });
+        // Auto-save summary if records found
+        if (dwResult.results && dwResult.results.length > 0) {
+          const buckets = [...new Set(dwResult.results.map((r: { bucket: string | null }) => r.bucket).filter(Boolean))];
+          await ctx.runMutation(api.investigations.addFinding, {
+            investigationId,
+            source: "darkweb_search",
+            category: "identity",
+            data: `Dark web/leak search for "${dwResult.term}": ${dwResult.totalResults} records found across ${buckets.length} source(s)${buckets.length > 0 ? ` (${buckets.slice(0, 5).join(", ")})` : ""}`,
+            confidence: 65,
+          });
+        }
+        return JSON.stringify(dwResult);
       }
 
       case "save_finding": {
