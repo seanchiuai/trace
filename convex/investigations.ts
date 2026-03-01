@@ -172,18 +172,23 @@ export const updateTokenUsage = mutation({
     id: v.id("investigations"),
     inputTokens: v.number(),
     outputTokens: v.number(),
+    model: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const investigation = await ctx.db.get(args.id);
     if (!investigation) return;
     const totalInput = (investigation.totalInputTokens ?? 0) + args.inputTokens;
     const totalOutput = (investigation.totalOutputTokens ?? 0) + args.outputTokens;
-    // Opus pricing: $15/M input, $75/M output
-    const cost = (totalInput / 1_000_000) * 15 + (totalOutput / 1_000_000) * 75;
+    // Compute incremental cost based on model pricing
+    const isSonnet = args.model?.includes("sonnet");
+    const inputRate = isSonnet ? 3 : 15; // $/M tokens
+    const outputRate = isSonnet ? 15 : 75; // $/M tokens
+    const incrementalCost = (args.inputTokens / 1_000_000) * inputRate + (args.outputTokens / 1_000_000) * outputRate;
+    const totalCost = (investigation.estimatedCost ?? 0) + incrementalCost;
     await ctx.db.patch(args.id, {
       totalInputTokens: totalInput,
       totalOutputTokens: totalOutput,
-      estimatedCost: Math.round(cost * 10000) / 10000,
+      estimatedCost: Math.round(totalCost * 10000) / 10000,
     });
   },
 });

@@ -27,29 +27,42 @@ Defined in `src/index.css`:
 
 | Token | Value | Usage |
 |-------|-------|-------|
-| `bg-primary` | `#0a0a0f` | Page background |
-| `bg-secondary` | `#12121a` | Section backgrounds |
-| `bg-card` | `#1a1a2e` | Cards, inputs, containers |
-| `bg-card-hover` | `#1f1f35` | Card hover state |
-| `border` | `#2a2a3e` | Default borders |
-| `border-bright` | `#3a3a5e` | Hover/active borders |
+| `bg-primary` | `#07070c` | Page background (near-black with blue undertone) |
+| `bg-secondary` | `#0d0d14` | Section backgrounds |
+| `bg-card` | `#13131f` | Cards, inputs, containers |
+| `bg-card-hover` | `#191928` | Card hover state |
+| `bg-elevated` | `#1a1a2a` | Modals, dropdowns |
+| `border` | `#1e1e32` | Default borders |
+| `border-bright` | `#2e2e4a` | Hover/active borders |
+| `border-accent` | `rgba(0, 255, 136, 0.2)` | Accent-tinted borders |
 | `accent` | `#00ff88` | CTA buttons, active indicators, highlights |
 | `accent-dim` | `#00cc6a` | Accent hover state |
-| `accent-glow` | `rgba(0, 255, 136, 0.3)` | Glow effects |
-| `danger` | `#ff4444` | Errors, low confidence (<40%) |
-| `warning` | `#ffaa00` | Medium confidence (40-79%) |
-| `info` | `#4488ff` | Planning status |
-| `text-primary` | `#e8e8f0` | Main body text |
-| `text-secondary` | `#8888aa` | Labels, secondary info |
-| `text-muted` | `#555577` | Placeholders, hints |
+| `accent-glow` | `rgba(0, 255, 136, 0.15)` | Glow effects |
+| `accent-bright` | `#33ffaa` | Bright accent for button hover |
+| `danger` | `#ff3b4f` | Errors, low confidence (<40%) |
+| `warning` | `#ffb224` | Medium confidence (40-79%) |
+| `info` | `#3b82f6` | Planning status |
+| `success` | `#00ff88` | Alias for accent |
+| `text-primary` | `#e4e4ef` | Main body text |
+| `text-secondary` | `#7e7e9a` | Labels, secondary info |
+| `text-muted` | `#4a4a66` | Placeholders, hints |
+| `text-accent` | `#00ff88` | Accent-colored text |
 
 ### Typography
 
+Two font families:
+
+| Role | Font | Usage |
+|------|------|-------|
+| Display | `Outfit` (300–900) | Headings, hero text, stat numbers, CTA buttons |
+| Data | `JetBrains Mono` (300–700) | Labels, metadata, code, timestamps, body text |
+
 ```css
-font-family: "JetBrains Mono", "Fira Code", "SF Mono", monospace;
+--font-display: "Outfit", system-ui, sans-serif;
+--font-mono: "JetBrains Mono", "Fira Code", monospace;
 ```
 
-All text is monospace. Labels use `text-xs uppercase tracking-wider text-text-secondary`.
+Use `.font-display` for Outfit, `font-mono` (default body) for JetBrains Mono. Labels use `text-xs uppercase tracking-wider text-text-secondary`.
 
 ## Component Inventory
 
@@ -63,13 +76,18 @@ All text is monospace. Labels use `text-xs uppercase tracking-wider text-text-se
 | `DetectiveReport` | `src/components/DetectiveReport.tsx` | Final report with stats + evidence |
 | `LeadTree` | `src/components/LeadTree.tsx` | Connection network visualization |
 | `ImageGallery` | `src/components/ImageGallery.tsx` | Found images grid |
+| `HudHeader` | `src/components/HudHeader.tsx` | Investigation HUD header with status, steps, cost, tokens |
+| `CommandStrip` | `src/components/CommandStrip.tsx` | Collapsible activity stream strip with expand/collapse |
+| `FindingToasts` | `src/components/FindingToasts.tsx` | Real-time finding notification toasts |
+| `CompletionFlash` | `src/components/CompletionFlash.tsx` | Full-screen investigation completion overlay |
 
 ## Pages
 
 | Page | Route | Layout |
 |------|-------|--------|
 | `Home` | `/` | Header → Hero → InputForm → Disclaimer |
-| `Investigation` | `/investigate/:id` | Header → 2-col (BrowserView \| ActivityStream + FindingsGrid) → Report |
+| `Investigation` | `/investigate/:id` | HudHeader → 2-col (BrowserView \| CommandStrip + FindingToasts) → CompletionFlash |
+| `Report` | `/report/:id` | DetectiveReport with full findings + evidence |
 
 ## Common Patterns
 
@@ -145,6 +163,7 @@ Single-letter abbreviations with tool-specific colors:
 | maigret | M | `text-blue-400` |
 | browser_action | B | `text-cyan-400` |
 | face_check | F | `text-green-400` |
+| web_search | W | `text-orange-400` |
 | save_finding | S | `text-yellow-400` |
 
 ### BrowserView States

@@ -63,9 +63,8 @@ export const runTask = internalAction({
     });
 
     if (!createRes.ok) {
-      const errBody = await createRes.text();
-      console.error("Browser Use task creation error:", errBody);
-      throw new Error(`Browser Use task creation failed (${createRes.status}): ${errBody.slice(0, 300)}`);
+      const errBody = await createRes.text().catch(() => "");
+      throw new Error(`BROWSER_TASK_CREATION_FAILED:${createRes.status}:${errBody}`);
     }
     const created = await createRes.json();
     const sessionId = created.id;

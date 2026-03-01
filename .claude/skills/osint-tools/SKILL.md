@@ -86,7 +86,7 @@ High-value platforms (Instagram, Facebook, Twitter, LinkedIn, GitHub, Telegram, 
 | Function | Type | Purpose |
 |----------|------|---------|
 | `search` | `internalAction` | Single username search with optional filtering |
-| `batchSearch` | `internalAction` | Parallel search for up to 5 usernames |
+| `investigate` | `internalAction` | Deep investigation: primary search → Claude extracts leads → searches lead usernames → builds connection graph |
 | `healthCheck` | `internalAction` | Check if sidecar is running |
 
 ```typescript
@@ -114,7 +114,7 @@ python server.py                   # → http://localhost:8000
 |------|------|
 | `sidecar/server.py` | FastAPI server wrapping Maigret CLI (search, batch, health, info) |
 | `sidecar/requirements.txt` | `maigret`, `fastapi`, `uvicorn[standard]` |
-| `convex/tools/maigret.ts` | `search`, `batchSearch`, `healthCheck` internalActions + `filterResults` helper |
+| `convex/tools/maigret.ts` | `search`, `investigate`, `healthCheck` internalActions + `filterResults` helper |
 
 ## Environment
 
