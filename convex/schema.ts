@@ -24,6 +24,7 @@ export default defineSchema({
     confidence: v.optional(v.number()),
     instructions: v.optional(v.string()),
     extremeMode: v.optional(v.boolean()),
+    disabledTools: v.optional(v.array(v.string())),
     errorMessage: v.optional(v.string()),
     stepCount: v.number(),
     totalInputTokens: v.optional(v.number()),
@@ -80,6 +81,7 @@ export default defineSchema({
     consecutiveSaveOnlySteps: v.number(),
     maigretAvailable: v.boolean(),
     extremeMode: v.boolean(),
+    disabledTools: v.optional(v.array(v.string())),
     createdAt: v.number(),
   }).index("by_investigation", ["investigationId"]),
 

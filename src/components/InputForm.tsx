@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
+import { STANDARD_TOOL_DEFS, EXTREME_TOOL_DEFS } from "../../convex/toolNames";
 
 interface InputFormProps {
   onSubmit: (data: {
@@ -10,9 +11,13 @@ interface InputFormProps {
     knownLinks: string[];
     instructions?: string;
     extremeMode: boolean;
+    disabledTools: string[];
   }) => void;
   loading: boolean;
 }
+
+const STANDARD_TOOLS = STANDARD_TOOL_DEFS;
+const EXTREME_TOOLS = EXTREME_TOOL_DEFS;
 
 function FormField({
   label,
@@ -51,6 +56,8 @@ export default function InputForm({ onSubmit, loading }: InputFormProps) {
   const [instructions, setInstructions] = useState("");
   const [focused, setFocused] = useState<string | null>(null);
   const [extremeMode, setExtremeMode] = useState(false);
+  const [integrationsOpen, setIntegrationsOpen] = useState(false);
+  const [disabledTools, setDisabledTools] = useState<Set<string>>(new Set());
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -68,6 +75,7 @@ export default function InputForm({ onSubmit, loading }: InputFormProps) {
       knownLinks,
       instructions: instructions.trim() || undefined,
       extremeMode,
+      disabledTools: Array.from(disabledTools),
     });
   };
 
@@ -191,12 +199,24 @@ export default function InputForm({ onSubmit, loading }: InputFormProps) {
         <motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, delay: 0.4 }}
+          transition={{ duration: 0.4, delay: 0.38 }}
           className="mt-6"
         >
           <button
             type="button"
-            onClick={() => setExtremeMode(!extremeMode)}
+            onClick={() => {
+              setExtremeMode((prev) => {
+                if (prev) {
+                  // Turning off: clear extreme tools from disabled set
+                  setDisabledTools((dt) => {
+                    const next = new Set(dt);
+                    EXTREME_TOOLS.forEach((t) => next.delete(t.name));
+                    return next;
+                  });
+                }
+                return !prev;
+              });
+            }}
             className={`w-full flex items-center justify-between px-4 py-3 rounded-lg border transition-all duration-300 ${
               extremeMode
                 ? "border-red-500/50 bg-red-500/5 shadow-[0_0_20px_rgba(239,68,68,0.08)]"
@@ -238,6 +258,94 @@ export default function InputForm({ onSubmit, loading }: InputFormProps) {
               Warning: Extreme mode accesses private data sources and leaked databases. Use responsibly.
             </motion.p>
           )}
+        </motion.div>
+
+        {/* Integrations section */}
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.4 }}
+          className="mt-4"
+        >
+          <button
+            type="button"
+            onClick={() => setIntegrationsOpen(!integrationsOpen)}
+            className="w-full flex items-center justify-between px-4 py-3 rounded-lg border border-border hover:border-border-bright bg-bg-card/50 transition-all duration-300"
+          >
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-mono font-bold tracking-[0.2em] uppercase text-text-muted">
+                Integrations
+              </span>
+              {disabledTools.size > 0 && (
+                <span className="text-[9px] font-mono text-accent/60 tracking-wide">
+                  {disabledTools.size} disabled
+                </span>
+              )}
+            </div>
+            <svg
+              className={`w-3.5 h-3.5 text-text-muted transition-transform duration-300 ${integrationsOpen ? "rotate-180" : ""}`}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          <AnimatePresence>
+          {integrationsOpen && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.25 }}
+              className="mt-2 space-y-1 overflow-hidden"
+            >
+              {[...STANDARD_TOOLS, ...(extremeMode ? EXTREME_TOOLS : [])].map((tool) => {
+                const enabled = !disabledTools.has(tool.name);
+                const extreme = EXTREME_TOOLS.some((t) => t.name === tool.name);
+                const onColor = extreme ? "bg-red-500/25" : "bg-accent/25";
+                const onBorder = extreme ? "border-red-500/40" : "border-accent/40";
+                const onDot = extreme
+                  ? "bg-red-400 shadow-[0_0_6px_rgba(239,68,68,0.4)]"
+                  : "bg-accent shadow-[0_0_6px_rgba(0,255,136,0.4)]";
+                const labelColor = !enabled ? "text-text-muted/50"
+                  : extreme ? "text-red-400/80" : "text-text-secondary";
+                return (
+                  <button
+                    key={tool.name}
+                    type="button"
+                    onClick={() => {
+                      setDisabledTools((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(tool.name)) next.delete(tool.name);
+                        else next.add(tool.name);
+                        return next;
+                      });
+                    }}
+                    className="w-full flex items-center justify-between px-4 py-2 rounded-md hover:bg-bg-card/60 transition-colors"
+                  >
+                    <span className={`text-[11px] font-mono ${labelColor}`}>
+                      {tool.label}
+                    </span>
+                    <div
+                      className={`relative w-8 h-4 rounded-full transition-colors duration-300 ${
+                        enabled ? onColor : "bg-bg-primary"
+                      } border ${enabled ? onBorder : "border-border"}`}
+                    >
+                      <div
+                        className={`absolute top-0.5 w-3 h-3 rounded-full transition-all duration-300 ${
+                          enabled
+                            ? `left-[calc(100%-14px)] ${onDot}`
+                            : "left-0.5 bg-text-muted/40"
+                        }`}
+                      />
+                    </div>
+                  </button>
+                );
+              })}
+            </motion.div>
+          )}
+          </AnimatePresence>
         </motion.div>
 
         {/* Submit button */}

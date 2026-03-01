@@ -10,6 +10,7 @@ export const create = mutation({
     knownLinks: v.array(v.string()),
     instructions: v.optional(v.string()),
     extremeMode: v.optional(v.boolean()),
+    disabledTools: v.optional(v.array(v.string())),
   },
   handler: async (ctx, args) => {
     const id = await ctx.db.insert("investigations", {
@@ -21,6 +22,7 @@ export const create = mutation({
       knownLinks: args.knownLinks,
       instructions: args.instructions,
       extremeMode: args.extremeMode,
+      disabledTools: args.disabledTools,
       status: "planning",
       stepCount: 0,
       createdAt: Date.now(),
@@ -252,6 +254,7 @@ export const createClarification = mutation({
     consecutiveSaveOnlySteps: v.number(),
     maigretAvailable: v.boolean(),
     extremeMode: v.boolean(),
+    disabledTools: v.optional(v.array(v.string())),
   },
   handler: async (ctx, args) => {
     const id = await ctx.db.insert("clarifications", {
@@ -264,6 +267,7 @@ export const createClarification = mutation({
       consecutiveSaveOnlySteps: args.consecutiveSaveOnlySteps,
       maigretAvailable: args.maigretAvailable,
       extremeMode: args.extremeMode,
+      disabledTools: args.disabledTools,
       createdAt: Date.now(),
     });
     await ctx.db.patch(args.investigationId, { status: "awaiting_input" });
