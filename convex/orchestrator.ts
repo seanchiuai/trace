@@ -393,8 +393,11 @@ export const step = internalAction({
     const browserCalls = toolCalls.filter((tc) => tc.tool === "browser_action");
     const parallelCalls = toolCalls.filter((tc) => tc.tool !== "browser_action");
 
+    const executionStart = Date.now();
+
     // Execute parallelizable tools concurrently
     const parallelPromises = parallelCalls.map(async (tc) => {
+      const toolStart = Date.now();
       const result = await executeToolCall(ctx, {
         investigationId: args.investigationId,
         investigation,
@@ -402,12 +405,14 @@ export const step = internalAction({
         stepNumber: currentStepNumber,
         extremeMode,
       });
+      console.log(`[timing] ${tc.tool} completed in ${Date.now() - toolStart}ms`);
       return { id: tc.id, tool: tc.tool, result };
     });
 
-    // Execute browser_action calls sequentially
+    // Execute browser_action calls sequentially (shared session)
     const browserResults: { id: string; tool: string; result: string }[] = [];
     for (const tc of browserCalls) {
+      const toolStart = Date.now();
       const result = await executeToolCall(ctx, {
         investigationId: args.investigationId,
         investigation,
@@ -415,6 +420,7 @@ export const step = internalAction({
         stepNumber: currentStepNumber,
         extremeMode,
       });
+      console.log(`[timing] browser_action completed in ${Date.now() - toolStart}ms (sequential)`);
       browserResults.push({ id: tc.id, tool: tc.tool, result });
     }
 
@@ -427,6 +433,8 @@ export const step = internalAction({
       }
     });
     toolResults.push(...browserResults);
+
+    console.log(`[timing] Step ${currentStepNumber}: ${toolCalls.length} tool(s) in ${Date.now() - executionStart}ms (${parallelCalls.length} parallel, ${browserCalls.length} sequential)`);
 
     // Re-order to match original toolCalls order for correct tool_result mapping
     const orderedResults = toolCalls.map((tc) =>
